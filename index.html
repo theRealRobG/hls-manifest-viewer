@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link data-trunk rel="icon" href="public/hls-manifest-viewer-logo.svg" type="image/svg+xml" />
+  <link data-trunk rel="rust" data-wasm-opt="z" data-weak-refs />
+  <style>
+    /* Page styles setup */
+    :root,
+    :host {
+      --font-sans: ui-sans-serif,
+        system-ui,
+        sans-serif,
+        'Apple Color Emoji',
+        'Segoe UI Emoji',
+        'Segoe UI Symbol',
+        'Noto Color Emoji';
+      --font-mono: ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        'Liberation Mono',
+        'Courier New',
+        monospace;
+      --color-sky-50: oklch(97.7% 0.013 236.62);
+      --color-sky-100: oklch(95.1% 0.026 236.824);
+      --color-sky-200: oklch(90.1% 0.058 230.902);
+      --color-sky-300: oklch(82.8% 0.111 230.318);
+      --color-sky-500: oklch(68.5% 0.169 237.323);
+      --color-sky-700: oklch(50% 0.134 242.749);
+      --color-sky-800: oklch(44.3% 0.11 240.79);
+      --color-sky-900: oklch(39.1% 0.09 240.876);
+      --color-sky-950: oklch(29.3% 0.066 243.157);
+      --color-stone-800: oklch(26.8% 0.007 34.298);
+      --color-stone-900: oklch(21.6% 0.006 56.043);
+      --color-white: #fff;
+      --spacing: 0.25rem;
+      --container-3xl: 48rem;
+      --text-sm: 0.875rem;
+      --text-sm--line-height: calc(1.25 / 0.875);
+      --text-5xl: 3rem;
+      --font-weight-bold: 700;
+      --leading-tight: 1.25;
+      --leading-loose: 2;
+    }
+
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+      margin: 0;
+      padding: 0;
+    }
+
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+      box-sizing: border-box;
+      border: 0 solid;
+    }
+
+    /* General page styling */
+    body {
+      @media (prefers-color-scheme: dark) {
+        background-color: var(--color-sky-950);
+      }
+    }
+
+    main {
+      width: 100%;
+      font-family: var(--font-sans);
+      padding: calc(var(--spacing) * 6);
+    }
+
+    h1 {
+      display: block;
+      box-sizing: border-box;
+      font-size: var(--text-5xl);
+      line-height: var(--leading-loose);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-sky-500);
+
+      @media (prefers-color-scheme: dark) {
+        color: var(--color-sky-300);
+      }
+    }
+
+    .body-content {
+      max-width: var(--container-3xl);
+      margin-inline: auto;
+    }
+
+    .body-text {
+      color: var(--color-stone-900);
+      line-height: 1.5;
+
+      @media (prefers-color-scheme: dark) {
+        color: var(--color-sky-50);
+      }
+    }
+
+    .body-list {
+      list-style-position: inside;
+      list-style-type: decimal;
+      padding: calc(var(--spacing) * 2);
+    }
+
+    /* Styling for the HLS playlist viewer */
+    .viewer-content {
+      font-family: var(--font-mono);
+      padding: calc(var(--spacing) * 3);
+      background-color: var(--color-stone-800);
+      color: var(--color-sky-100);
+      overflow: scroll;
+      overflow-wrap: break-word;
+      margin-bottom: calc(var(--spacing) * 6);
+    }
+
+    .viewer-content p,
+    .viewer-content a {
+      margin-block: var(--spacing);
+      font-size: var(--text-sm);
+      line-height: var(--leading-tight);
+    }
+
+    .viewer-content a {
+      color: var(--color-sky-300);
+      text-decoration-line: underline;
+    }
+
+    .viewer-content .hls-line.uri {
+      margin-bottom: var(--spacing);
+    }
+
+    /* Styling for the URL input form */
+    .uri-input-form {
+      margin-top: calc(var(--spacing) * 6);
+    }
+
+    .uri-input-form .uri-input-form-inner-container {
+      display: flex;
+      align-items: center;
+      border-bottom-style: solid;
+      border-bottom-width: 1px;
+      border-color: var(--color-sky-500);
+      padding-block: calc(var(--spacing) * 2);
+    }
+
+    .uri-input-form .uri-input-form-inner-container input {
+      appearance: none;
+      border-style: none;
+      width: 100%;
+      margin-right: calc(var(--spacing) * 3);
+      background-color: transparent;
+      padding-inline: calc(var(--spacing) * 2);
+      padding-block: var(--spacing);
+      line-height: var(--leading-tight);
+      color: var(--color-sky-900);
+      outline: none;
+      font: inherit;
+
+      @media (prefers-color-scheme: dark) {
+        color: var(--color-sky-200);
+      }
+    }
+
+    .uri-input-form .uri-input-form-inner-container input::placeholder {
+      color: var(--color-sky-200);
+
+      @media (prefers-color-scheme: dark) {
+        color: var(--color-sky-800);
+      }
+    }
+
+    .uri-input-form .uri-input-form-inner-container button {
+      appearance: button;
+      flex-shrink: 0;
+      cursor: pointer;
+      background-color: var(--color-sky-500);
+      border-radius: 0.25rem;
+      border-style: solid;
+      border-width: 4px;
+      border-color: var(--color-sky-500);
+      padding-inline: calc(var(--spacing) * 2);
+      padding-block: var(--spacing);
+      font-size: var(--text-sm);
+      line-height: var(--text-sm--line-height);
+      color: var(--color-white);
+    }
+
+    .uri-input-form .uri-input-form-inner-container button:hover {
+      background-color: var(--color-sky-700);
+      border-color: var(--color-sky-700);
+    }
+  </style>
+</head>
+
+<body></body>
+
+</html>
