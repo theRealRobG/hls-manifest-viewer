@@ -10,11 +10,12 @@ leptos_router = { version = "0.8" }
 console_error_panic_hook = "0.1"
 m3u8 = { git = "https://github.com/theRealRobG/m3u8", tag = "0.2.0" }
 fluent-uri = "0.3"
+web-sys = { version = "0.3", features = ["Document", "Window", "Response"] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
 
 [dev-dependencies]
-wasm-bindgen = "0.2"
 wasm-bindgen-test = "0.3"
-web-sys = { version = "0.3", features = ["Document", "Window"] }
 pretty_assertions = "1.4"
 
 [profile.release]

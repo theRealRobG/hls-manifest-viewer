@@ -137,11 +137,11 @@
     }
 
     /* Styling for the URL input form */
-    .uri-input-form {
+    .url-input-form {
       margin-top: calc(var(--spacing) * 6);
     }
 
-    .uri-input-form .uri-input-form-inner-container {
+    .url-input-form .url-input-form-inner-container {
       display: flex;
       align-items: center;
       border-bottom-style: solid;
@@ -150,7 +150,7 @@
       padding-block: calc(var(--spacing) * 2);
     }
 
-    .uri-input-form .uri-input-form-inner-container input {
+    .url-input-form .url-input {
       appearance: none;
       border-style: none;
       width: 100%;
@@ -168,7 +168,7 @@
       }
     }
 
-    .uri-input-form .uri-input-form-inner-container input::placeholder {
+    .url-input-form .url-input::placeholder {
       color: var(--color-sky-200);
 
       @media (prefers-color-scheme: dark) {
@@ -176,7 +176,7 @@
       }
     }
 
-    .uri-input-form .uri-input-form-inner-container button {
+    .url-input-form .submit {
       appearance: button;
       flex-shrink: 0;
       cursor: pointer;
@@ -192,7 +192,7 @@
       color: var(--color-white);
     }
 
-    .uri-input-form .uri-input-form-inner-container button:hover {
+    .url-input-form .submit:hover {
       background-color: var(--color-sky-700);
       border-color: var(--color-sky-700);
     }

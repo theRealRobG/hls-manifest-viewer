@@ -555,6 +555,7 @@ dependencies = [
  "m3u8",
  "pretty_assertions",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "web-sys",
 ]

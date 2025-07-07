@@ -1,0 +1,32 @@
+use leptos::prelude::*;
+use leptos_router::{components::Form, hooks::use_query_map};
+
+use crate::PLAYLIST_URL_QUERY_NAME;
+
+#[component]
+pub fn UrlInputForm() -> impl IntoView {
+    let query = use_query_map();
+    let playlist_url = move || {
+        query
+            .read()
+            .get(PLAYLIST_URL_QUERY_NAME)
+            .unwrap_or_default()
+    };
+
+    view! {
+        <Form attr:class="url-input-form" method="GET" action="">
+            <div class="url-input-form-inner-container">
+                <input
+                    class="url-input"
+                    type="url"
+                    name=PLAYLIST_URL_QUERY_NAME
+                    value=playlist_url
+                    placeholder="https://example.com/mvp.m3u8"
+                    pattern="https://.*"
+                    aria-label="Playlist"
+                />
+                <input class="submit" type="submit" />
+            </div>
+        </Form>
+    }
+}

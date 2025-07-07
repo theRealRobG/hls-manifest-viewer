@@ -1,3 +1,4 @@
+use crate::PLAYLIST_URL_QUERY_NAME;
 use fluent_uri::{
     encoding::{
         encoder::{Data, Query},
@@ -16,26 +17,36 @@ use m3u8::{
     Reader,
 };
 
-const EXAMPLE_PLAYLIST_URI: &str = "https://example.com/mvp.m3u8";
-const EXAMPLE_PLAYLIST: &str = r#"#EXTM3U
-#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aac",NAME="English",DEFAULT=YES,AUTOSELECT=YES,LANGUAGE="en",URI="main/english-audio.m3u8"
-#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aac",NAME="Deutsch",DEFAULT=NO,AUTOSELECT=YES,LANGUAGE="de",URI="main/german-audio.m3u8"
-#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aac",NAME="Commentary",DEFAULT=NO,AUTOSELECT=NO,LANGUAGE="en",URI="commentary/audio-only.m3u8"
-#EXT-X-STREAM-INF:BANDWIDTH=1280000,CODECS="avc1.4d401e,mp4a.40.5",AUDIO="aac"
-low/video-only.m3u8
-#EXT-X-STREAM-INF:BANDWIDTH=2560000,CODECS="avc1.4d401f,mp4a.40.5",AUDIO="aac"
-mid/video-only.m3u8
-#EXT-X-STREAM-INF:BANDWIDTH=7680000,CODECS="avc1.64001f,mp4a.40.5",AUDIO="aac"
-hi/video-only.m3u8
-#EXT-X-STREAM-INF:BANDWIDTH=65000,CODECS="mp4a.40.5",AUDIO="aac"
-main/english-audio.m3u8
-"#;
+const VIEWER_CLASS: &str = "viewer-content";
+const ERROR_CLASS: &str = "error";
+const TAG_CLASS: &str = "hls-line tag";
+const URI_CLASS: &str = "hls-line uri";
+const COMMENT_CLASS: &str = "hls-line comment";
+const BLANK_CLASS: &str = "hls-line blank";
 
 #[component]
-pub fn Viewer() -> impl IntoView {
-    let base_url = Uri::parse(EXAMPLE_PLAYLIST_URI).ok();
+pub fn ViewerLoading() -> impl IntoView {
+    view! {
+        <div class=VIEWER_CLASS>
+            <p>"Loading..."</p>
+        </div>
+    }
+}
+
+#[component]
+pub fn ViewerError(error: String) -> impl IntoView {
+    view! {
+        <div class=VIEWER_CLASS>
+            <p class=ERROR_CLASS>{error}</p>
+        </div>
+    }
+}
+
+#[component]
+pub fn Viewer(playlist: String, base_url: String) -> impl IntoView {
+    let base_url = Uri::parse(base_url.as_str()).ok();
     let mut reader = Reader::from_str(
-        EXAMPLE_PLAYLIST,
+        playlist.as_str(),
         ParsingOptionsBuilder::new()
             .with_parsing_for_media()
             .with_parsing_for_i_frame_stream_inf()
@@ -54,7 +65,7 @@ pub fn Viewer() -> impl IntoView {
                         } else {
                             let line = media.into_inner();
                             lines.push(
-                                view! { <p class="hls-line tag">{String::from_utf8_lossy(line.value())}</p> }.into_any()
+                                view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any()
                             );
                         }
                     }
@@ -66,7 +77,7 @@ pub fn Viewer() -> impl IntoView {
                     tag => {
                         let line = tag.into_inner();
                         lines.push(
-                            view! { <p class="hls-line tag">{String::from_utf8_lossy(line.value())}</p> }.into_any()
+                            view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any()
                         );
                     }
                 },
@@ -74,23 +85,23 @@ pub fn Viewer() -> impl IntoView {
             },
             HlsLine::Uri(uri) => lines.push(
                 view! {
-                    <a href=resolve_href(&base_url, uri) class="hls-line uri">
+                    <a href=resolve_href(&base_url, uri) class=URI_CLASS>
                         {uri}
                     </a>
                 }
                 .into_any(),
             ),
             HlsLine::Comment(comment) => {
-                lines.push(view! { <p class="hls-line comment">"#" {comment}</p> }.into_any())
+                lines.push(view! { <p class=COMMENT_CLASS>"#" {comment}</p> }.into_any())
             }
             HlsLine::UnknownTag(tag) => lines.push(
-                view! { <p class="hls-line tag">{String::from_utf8_lossy(tag.as_bytes())}</p> }
+                view! { <p class=TAG_CLASS>{String::from_utf8_lossy(tag.as_bytes())}</p> }
                     .into_any(),
             ),
-            HlsLine::Blank => lines.push(view! { <p class="hls-line blank"></p> }.into_any()),
+            HlsLine::Blank => lines.push(view! { <p class=BLANK_CLASS></p> }.into_any()),
         }
     }
-    view! { <div class="viewer-content">{lines}</div> }
+    view! { <div class=VIEWER_CLASS>{lines}</div> }
 }
 
 fn resolve_href(base_url: &Option<Uri<&str>>, uri: &str) -> String {
@@ -102,7 +113,7 @@ fn resolve_href(base_url: &Option<Uri<&str>>, uri: &str) -> String {
             {
                 let mut query = EString::<Query>::new();
                 query.push('?');
-                query.encode::<Data>("playlist_url");
+                query.encode::<Data>(PLAYLIST_URL_QUERY_NAME);
                 query.push('=');
                 query.encode::<Data>(absolute_url.as_str());
                 Some(query.into_string())
@@ -120,7 +131,7 @@ fn view_from_uri_tag(uri: String, tag_inner: TagInner, base_url: &Option<Uri<&st
     let (first, second) = line.split_at(uri_index);
     let (second, third) = second.split_at(uri.len());
     view! {
-        <p class="hls-line tag">
+        <p class=TAG_CLASS>
             {first}<a href=resolve_href(base_url, uri.as_str())>{second}</a>{third}
         </p>
     }
