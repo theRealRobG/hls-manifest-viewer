@@ -1,5 +1,5 @@
 use crate::PLAYLIST_URL_QUERY_NAME;
-use leptos::prelude::*;
+use leptos::{either::Either, prelude::*};
 use m3u8::{
     config::ParsingOptionsBuilder,
     line::HlsLine,
@@ -10,6 +10,7 @@ use m3u8::{
     Reader,
 };
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+use std::{error::Error, fmt::Display};
 use url::Url;
 
 const VIEWER_CLASS: &str = "viewer-content";
@@ -39,17 +40,52 @@ pub fn ViewerError(error: String) -> impl IntoView {
 
 #[component]
 pub fn Viewer(playlist: String, base_url: String) -> impl IntoView {
+    if playlist.is_empty() {
+        return Either::Left(view! { <div class=VIEWER_CLASS>{Vec::new()}</div> });
+    }
+    match try_get_lines(&playlist, &base_url) {
+        Ok(lines) => Either::Left(view! { <div class=VIEWER_CLASS>{lines}</div> }),
+        Err(error) => Either::Right(view! { <ViewerError error=error.to_string() /> }),
+    }
+}
+
+#[derive(Debug)]
+enum ViewerError {
+    PlaylistIdentifierNotPresent,
+}
+impl Display for ViewerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::PlaylistIdentifierNotPresent => {
+                write!(f, "Error: playlist identifier (#EXTM3U) not present")
+            }
+        }
+    }
+}
+impl Error for ViewerError {}
+
+fn try_get_lines(playlist: &str, base_url: &str) -> Result<Vec<AnyView>, ViewerError> {
     // The base_url should never fail to parse. I _could_ create a separate flow in this case that
     // makes no attempt to insert links, but I feel that is an over-complication.
-    let base_url = Url::parse(&base_url).ok();
+    let base_url = Url::parse(base_url).ok();
     let mut reader = Reader::from_str(
-        playlist.as_str(),
+        playlist,
         ParsingOptionsBuilder::new()
+            .with_parsing_for_m3u()
             .with_parsing_for_media()
             .with_parsing_for_i_frame_stream_inf()
             .build(),
     );
     let mut lines = Vec::new();
+    match reader.read_line() {
+        Ok(Some(HlsLine::KnownTag(known::Tag::Hls(hls::Tag::M3u(tag))))) => {
+            let line = tag.into_inner();
+            lines.push(
+                view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any(),
+            );
+        }
+        _ => return Err(ViewerError::PlaylistIdentifierNotPresent),
+    }
     while let Ok(Some(line)) = reader.read_line() {
         match line {
             HlsLine::KnownTag(tag) => match tag {
@@ -98,7 +134,7 @@ pub fn Viewer(playlist: String, base_url: String) -> impl IntoView {
             HlsLine::Blank => lines.push(view! { <p class=BLANK_CLASS></p> }.into_any()),
         }
     }
-    view! { <div class=VIEWER_CLASS>{lines}</div> }
+    Ok(lines)
 }
 
 fn resolve_href(base_url: &Option<Url>, uri: &str) -> String {
