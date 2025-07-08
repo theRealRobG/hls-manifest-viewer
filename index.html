@@ -23,6 +23,8 @@
         'Liberation Mono',
         'Courier New',
         monospace;
+      --color-green-600: oklch(62.7% 0.194 149.214);
+      --color-red-400: oklch(70.4% 0.191 22.216);
       --color-sky-50: oklch(97.7% 0.013 236.62);
       --color-sky-100: oklch(95.1% 0.026 236.824);
       --color-sky-200: oklch(90.1% 0.058 230.902);
@@ -134,6 +136,14 @@
 
     .viewer-content .hls-line.uri {
       margin-bottom: var(--spacing);
+    }
+
+    .viewer-content .error {
+      color: var(--color-red-400);
+    }
+
+    .viewer-content .comment {
+      color: var(--color-green-600);
     }
 
     /* Styling for the URL input form */
