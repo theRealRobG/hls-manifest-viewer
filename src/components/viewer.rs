@@ -1,15 +1,15 @@
 use crate::PLAYLIST_URL_QUERY_NAME;
 use leptos::{either::Either, prelude::*};
 use m3u8::{
+    Reader,
     config::ParsingOptionsBuilder,
     line::HlsLine,
     tag::{
         hls::{self, TagInner},
         known,
     },
-    Reader,
 };
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 use std::{error::Error, fmt::Display};
 use url::Url;
 
@@ -33,7 +33,20 @@ pub fn ViewerLoading() -> impl IntoView {
 pub fn ViewerError(error: String) -> impl IntoView {
     view! {
         <div class=VIEWER_CLASS>
-            <p class=ERROR_CLASS>{error}</p>
+            {move || {
+                let mut split = error.splitn(2, '\n');
+                let base_message = split.next().unwrap_or("Error");
+                let extra_info = split.next();
+                if let Some(extra_info) = extra_info {
+                    view! {
+                        <p class=ERROR_CLASS>{base_message}</p>
+                        <pre class=ERROR_CLASS>{extra_info}</pre>
+                    }
+                        .into_any()
+                } else {
+                    view! { <p class=ERROR_CLASS>{base_message}</p> }.into_any()
+                }
+            }}
         </div>
     }
 }
@@ -149,7 +162,7 @@ fn resolve_href(base_url: &Option<Url>, uri: &str) -> String {
         format!(
             "?{}={}",
             PLAYLIST_URL_QUERY_NAME,
-            utf8_percent_encode(absolute_url.as_str(), QUERY).to_string()
+            utf8_percent_encode(absolute_url.as_str(), QUERY)
         )
     } else {
         String::from("#")

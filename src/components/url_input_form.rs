@@ -22,8 +22,9 @@ pub fn UrlInputForm() -> impl IntoView {
                     name=PLAYLIST_URL_QUERY_NAME
                     value=playlist_url
                     placeholder="https://example.com/mvp.m3u8"
-                    pattern="https://.*"
-                    aria-label="Playlist"
+                    pattern="https?://.*"
+                    aria-label="playlist url"
+                    title="url with http or https scheme (e.g. https://example.com/mvp.m3u8)"
                 />
                 <input class="submit" type="submit" />
             </div>

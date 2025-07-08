@@ -9,7 +9,13 @@ leptos_meta = { version = "0.8" }
 leptos_router = { version = "0.8" }
 console_error_panic_hook = "0.1"
 m3u8 = { git = "https://github.com/theRealRobG/m3u8", tag = "0.2.0" }
-web-sys = { version = "0.3", features = ["Document", "Window", "Response"] }
+web-sys = { version = "0.3", features = [
+    "Document",
+    "Window",
+    "Response",
+    "DomException",
+    "Headers",
+] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 url = "2.5"
