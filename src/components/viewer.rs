@@ -1,11 +1,4 @@
 use crate::PLAYLIST_URL_QUERY_NAME;
-use fluent_uri::{
-    encoding::{
-        encoder::{Data, Query},
-        EString,
-    },
-    Uri, UriRef,
-};
 use leptos::prelude::*;
 use m3u8::{
     config::ParsingOptionsBuilder,
@@ -16,6 +9,8 @@ use m3u8::{
     },
     Reader,
 };
+use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+use url::Url;
 
 const VIEWER_CLASS: &str = "viewer-content";
 const ERROR_CLASS: &str = "error";
@@ -44,7 +39,9 @@ pub fn ViewerError(error: String) -> impl IntoView {
 
 #[component]
 pub fn Viewer(playlist: String, base_url: String) -> impl IntoView {
-    let base_url = Uri::parse(base_url.as_str()).ok();
+    // The base_url should never fail to parse. I _could_ create a separate flow in this case that
+    // makes no attempt to insert links, but I feel that is an over-complication.
+    let base_url = Url::parse(&base_url).ok();
     let mut reader = Reader::from_str(
         playlist.as_str(),
         ParsingOptionsBuilder::new()
@@ -104,28 +101,26 @@ pub fn Viewer(playlist: String, base_url: String) -> impl IntoView {
     view! { <div class=VIEWER_CLASS>{lines}</div> }
 }
 
-fn resolve_href(base_url: &Option<Uri<&str>>, uri: &str) -> String {
-    base_url
-        .map(|base_url| {
-            if let Some(absolute_url) = UriRef::parse(uri)
-                .ok()
-                .and_then(|uri| uri.resolve_against(&base_url).ok())
-            {
-                let mut query = EString::<Query>::new();
-                query.push('?');
-                query.encode::<Data>(PLAYLIST_URL_QUERY_NAME);
-                query.push('=');
-                query.encode::<Data>(absolute_url.as_str());
-                Some(query.into_string())
-            } else {
-                None
-            }
-        })
-        .flatten()
-        .unwrap_or(String::from("#"))
+fn resolve_href(base_url: &Option<Url>, uri: &str) -> String {
+    let Some(base_url) = base_url else {
+        return String::from("#");
+    };
+    if let Ok(absolute_url) = base_url.join(uri) {
+        // https://url.spec.whatwg.org/#query-percent-encode-set
+        // The query percent-encode set is the C0 control percent-encode set and U+0020 SPACE,
+        // U+0022 ("), U+0023 (#), U+003C (<), and U+003E (>).
+        const QUERY: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'#').add(b'<').add(b'>');
+        format!(
+            "?{}={}",
+            PLAYLIST_URL_QUERY_NAME,
+            utf8_percent_encode(absolute_url.as_str(), QUERY).to_string()
+        )
+    } else {
+        String::from("#")
+    }
 }
 
-fn view_from_uri_tag(uri: String, tag_inner: TagInner, base_url: &Option<Uri<&str>>) -> AnyView {
+fn view_from_uri_tag(uri: String, tag_inner: TagInner, base_url: &Option<Url>) -> AnyView {
     let line = String::from_utf8_lossy(tag_inner.value());
     let uri_index = line.find(uri.as_str()).unwrap();
     let (first, second) = line.split_at(uri_index);
@@ -144,52 +139,51 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn robtest() {
-        let uri = "example.com";
-        let x = "EXT-X-MEDIA:URI=\"example.com\",TYPE=AUDIO";
-        let index = x.find(uri).unwrap();
-        let (first, second) = x.split_at(index);
-        let (second, third) = second.split_at(uri.len());
-        println!("First: {} Second: {} Third: {}", first, second, third);
-    }
-
-    #[test]
     fn resolve_href_should_provide_local_uri_with_query_for_relative_uri() {
-        let base_url = Uri::parse("https://example.com/hls/mvp.m3u8").unwrap();
+        let base_url = Url::parse("https://example.com/hls/mvp.m3u8").unwrap();
         let uri = "hi/video-only.m3u8";
         assert_eq!(
-            "?playlist_url=https%3A%2F%2Fexample.com%2Fhls%2Fhi%2Fvideo-only.m3u8".to_string(),
+            "?playlist_url=https://example.com/hls/hi/video-only.m3u8".to_string(),
             resolve_href(&Some(base_url), uri)
         );
     }
 
     #[test]
     fn resolve_href_should_provide_local_uri_with_query_for_absolute_uri() {
-        let base_url = Uri::parse("https://example.com/hls/mvp.m3u8").unwrap();
+        let base_url = Url::parse("https://example.com/hls/mvp.m3u8").unwrap();
         let uri = "https://ads.server.com/ads/hls/hi/video-only.m3u8";
         assert_eq!(
-            "?playlist_url=https%3A%2F%2Fads.server.com%2Fads%2Fhls%2Fhi%2Fvideo-only.m3u8"
-                .to_string(),
+            "?playlist_url=https://ads.server.com/ads/hls/hi/video-only.m3u8".to_string(),
             resolve_href(&Some(base_url), uri)
         );
     }
 
     #[test]
     fn resolve_href_should_provide_local_uri_with_query_for_uri_stepping_out_of_base_path() {
-        let base_url = Uri::parse("https://ads.com/1234/main/mvp.m3u8").unwrap();
+        let base_url = Url::parse("https://ads.com/1234/main/mvp.m3u8").unwrap();
         let uri = "../media/3.m3u8";
         assert_eq!(
-            "?playlist_url=https%3A%2F%2Fads.com%2F1234%2Fmedia%2F3.m3u8".to_string(),
+            "?playlist_url=https://ads.com/1234/media/3.m3u8".to_string(),
             resolve_href(&Some(base_url), uri)
         );
     }
 
     #[test]
-    fn resolve_href_should_escape_query_parts() {
-        let base_url = Uri::parse("https://example.com/hls/mvp.m3u8").unwrap();
+    fn resolve_href_does_not_need_to_escape_query_parts() {
+        let base_url = Url::parse("https://example.com/hls/mvp.m3u8").unwrap();
         let uri = "hi/video-only.m3u8?token=1234";
         assert_eq!(
-            "?playlist_url=https%3A%2F%2Fexample.com%2Fhls%2Fhi%2Fvideo-only.m3u8%3Ftoken%3D1234"
+            "?playlist_url=https://example.com/hls/hi/video-only.m3u8?token=1234".to_string(),
+            resolve_href(&Some(base_url), uri)
+        );
+    }
+
+    #[test]
+    fn resolve_href_should_escape_fragment() {
+        let base_url = Url::parse("https://example.com/hls/mvp.m3u8").unwrap();
+        let uri = "hi/video-only.m3u8?token=1234#fragment";
+        assert_eq!(
+            "?playlist_url=https://example.com/hls/hi/video-only.m3u8?token=1234%23fragment"
                 .to_string(),
             resolve_href(&Some(base_url), uri)
         );
