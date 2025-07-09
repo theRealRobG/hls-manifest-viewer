@@ -22,7 +22,13 @@ pub fn Home() -> impl IntoView {
         fetch_url(playlist_url)
     });
     view! {
-        <HomeHeader />
+        <h1 class="body-content">"HLS Manifest Viewer"</h1>
+        <p class="body-content body-text">
+            r#"Enter your HLS playlist URL in the input below. If possible, it is best to provide
+            the URL to the multivariant playlist (MVP) rather than the media, as this allows for
+            any "# <code>"EXT-X-DEFINE:IMPORT"</code> r#" declarations in the media to be resolved
+            correctly against the MVP."#
+        </p>
         <UrlInputForm />
         <Suspense fallback=ViewerLoading>
             {move || {
@@ -107,17 +113,4 @@ async fn response_failure_string(response: Response) -> String {
         base_message.push_str(&text);
     }
     base_message
-}
-
-#[component]
-fn HomeHeader() -> impl IntoView {
-    view! {
-        <h1 class="body-content">"HLS Manifest Viewer"</h1>
-        <p class="body-content body-text">
-            r#"Enter your HLS playlist URL in the input below. If possible, it is best to provide
-            the URL to the multivariant playlist (MVP) rather than the media, as this allows for
-            any "# <code>"EXT-X-DEFINE:IMPORT"</code> r#" declarations in the media to be resolved
-            correctly against the MVP."#
-        </p>
-    }
 }
