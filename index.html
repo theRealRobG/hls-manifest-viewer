@@ -3,6 +3,7 @@
 
 <head>
   <link data-trunk rel="icon" href="public/hls-manifest-viewer-logo.svg" type="image/svg+xml" />
+  <link data-trunk rel="copy-file" href="public/github-mark-white.svg" type="image/svg+xml" />
   <link data-trunk rel="rust" data-wasm-opt="z" data-weak-refs />
   <style>
     /* Page styles setup */
@@ -45,6 +46,7 @@
       --font-weight-bold: 700;
       --leading-tight: 1.25;
       --leading-loose: 2;
+      --main-padding: calc(var(--spacing) * 6);
     }
 
     *,
@@ -75,7 +77,7 @@
     main {
       width: 100%;
       font-family: var(--font-sans);
-      padding: calc(var(--spacing) * 6);
+      padding: var(--main-padding);
     }
 
     h1 {
@@ -109,6 +111,51 @@
       list-style-position: inside;
       list-style-type: decimal;
       padding: calc(var(--spacing) * 2);
+    }
+
+    .button {
+      appearance: button;
+      flex-shrink: 0;
+      cursor: pointer;
+      background-color: var(--color-sky-500);
+      border-radius: 0.25rem;
+      border-style: solid;
+      border-width: 4px;
+      border-color: var(--color-sky-500);
+      padding-inline: calc(var(--spacing) * 2);
+      padding-block: var(--spacing);
+      font-size: var(--text-sm);
+      line-height: var(--text-sm--line-height);
+      color: var(--color-white);
+    }
+
+    .button:hover {
+      background-color: var(--color-sky-700);
+      border-color: var(--color-sky-700);
+    }
+
+    /* Nav styling */
+    nav {
+      display: flex;
+      padding: var(--main-padding);
+      padding-bottom: 0;
+      font-family: var(--font-sans);
+      font-size: var(--text-sm);
+      line-height: var(--text-sm--line-height);
+    }
+
+    nav .button {
+      margin-left: calc(var(--spacing) * 2);
+      text-decoration: none;
+    }
+
+    nav .button:first-child {
+      margin-left: auto;
+    }
+
+    nav .button img,
+    nav .button svg {
+      height: var(--text-sm);
     }
 
     /* Styling for the HLS playlist viewer */
@@ -185,27 +232,6 @@
       @media (prefers-color-scheme: dark) {
         color: var(--color-sky-800);
       }
-    }
-
-    .url-input-form .submit {
-      appearance: button;
-      flex-shrink: 0;
-      cursor: pointer;
-      background-color: var(--color-sky-500);
-      border-radius: 0.25rem;
-      border-style: solid;
-      border-width: 4px;
-      border-color: var(--color-sky-500);
-      padding-inline: calc(var(--spacing) * 2);
-      padding-block: var(--spacing);
-      font-size: var(--text-sm);
-      line-height: var(--text-sm--line-height);
-      color: var(--color-white);
-    }
-
-    .url-input-form .submit:hover {
-      background-color: var(--color-sky-700);
-      border-color: var(--color-sky-700);
     }
   </style>
 </head>

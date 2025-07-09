@@ -6,7 +6,7 @@ use leptos_router::{components::*, path};
 mod components;
 mod pages;
 // Pages
-use crate::pages::{home::Home, not_found::NotFound};
+use crate::pages::{about::About, home::Home, not_found::NotFound};
 
 pub(crate) const PLAYLIST_URL_QUERY_NAME: &str = "playlist_url";
 
@@ -22,9 +22,27 @@ pub fn App() -> impl IntoView {
         <Title text="HLS Manifest Viewer" />
 
         <Router>
-            <Routes fallback=NotFound>
-                <Route path=path!("/") view=Home />
-            </Routes>
+            <nav>
+                <a class="button" href="/">
+                    "Home"
+                </a>
+                <a class="button" href="/about">
+                    "About"
+                </a>
+                <a
+                    class="button"
+                    href="https://github.com/theRealRobG/hls-manifest-viewer"
+                    target="_blank"
+                >
+                    <img src="/github-mark-white.svg" />
+                </a>
+            </nav>
+            <main>
+                <Routes fallback=NotFound>
+                    <Route path=path!("/") view=Home />
+                    <Route path=path!("/about") view=About />
+                </Routes>
+            </main>
         </Router>
     }
 }

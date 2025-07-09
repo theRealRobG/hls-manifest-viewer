@@ -26,7 +26,7 @@ pub fn UrlInputForm() -> impl IntoView {
                     aria-label="playlist url"
                     title="url with http or https scheme (e.g. https://example.com/mvp.m3u8)"
                 />
-                <input class="submit" type="submit" />
+                <input class="button" type="submit" />
             </div>
         </Form>
     }
