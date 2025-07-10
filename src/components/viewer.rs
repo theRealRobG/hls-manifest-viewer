@@ -1,15 +1,15 @@
 use crate::PLAYLIST_URL_QUERY_NAME;
 use leptos::{either::Either, prelude::*};
 use m3u8::{
-    Reader,
     config::ParsingOptionsBuilder,
     line::HlsLine,
     tag::{
         hls::{self, TagInner},
         known,
     },
+    Reader,
 };
-use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
+use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use std::{error::Error, fmt::Display};
 use url::Url;
 
@@ -30,21 +30,20 @@ pub fn ViewerLoading() -> impl IntoView {
 }
 
 #[component]
-pub fn ViewerError(error: String) -> impl IntoView {
+pub fn ViewerError(error: String, #[prop(optional)] extra_info: Option<String>) -> impl IntoView {
     view! {
         <div class=VIEWER_CLASS>
             {move || {
-                let mut split = error.splitn(2, '\n');
-                let base_message = split.next().unwrap_or("Error");
-                let extra_info = split.next();
+                let error = error.to_owned();
+                let extra_info = extra_info.to_owned();
                 if let Some(extra_info) = extra_info {
                     view! {
-                        <p class=ERROR_CLASS>{base_message}</p>
+                        <p class=ERROR_CLASS>{error}</p>
                         <pre class=ERROR_CLASS>{extra_info}</pre>
                     }
                         .into_any()
                 } else {
-                    view! { <p class=ERROR_CLASS>{base_message}</p> }.into_any()
+                    view! { <p class=ERROR_CLASS>{error}</p> }.into_any()
                 }
             }}
         </div>

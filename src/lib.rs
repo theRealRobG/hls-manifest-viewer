@@ -5,6 +5,7 @@ use leptos_router::{components::*, path};
 // Modules
 mod components;
 mod pages;
+mod utils;
 // Pages
 use crate::pages::{about::About, home::Home, not_found::NotFound};
 
