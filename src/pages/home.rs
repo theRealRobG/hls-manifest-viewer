@@ -1,8 +1,5 @@
 use crate::{
-    components::{
-        url_input_form::UrlInputForm,
-        viewer::{Viewer, ViewerError, ViewerLoading},
-    },
+    components::{UrlInputForm, Viewer, ViewerError, ViewerLoading},
     utils::network::fetch_text,
     PLAYLIST_URL_QUERY_NAME,
 };
@@ -26,31 +23,43 @@ pub fn Home() -> impl IntoView {
         </p>
         <UrlInputForm />
         <Suspense fallback=ViewerLoading>
-            {move || {
-                playlist_result
-                    .get()
-                    .map(|result| match result {
-                        Ok(response) => {
-                            Either::Left(
-                                view! {
-                                    <Viewer
-                                        playlist=response.response_text
-                                        base_url=response.request_url
-                                    />
-                                },
-                            )
-                        }
-                        Err(error) => {
-                            Either::Right(
-                                if let Some(extra_info) = error.extra_info {
-                                    view! { <ViewerError error=error.error extra_info /> }
-                                } else {
-                                    view! { <ViewerError error=error.error /> }
-                                },
-                            )
-                        }
-                    })
-            }}
+            <ErrorBoundary fallback=|errors| {
+                view! {
+                    {move || {
+                        errors
+                            .get()
+                            .into_iter()
+                            .map(|(_, error)| view! { <ViewerError error=error.to_string() /> })
+                            .collect::<Vec<_>>()
+                    }}
+                }
+            }>
+                {move || {
+                    playlist_result
+                        .get()
+                        .map(|result| match result {
+                            Ok(response) => {
+                                Either::Left(
+                                    view! {
+                                        <Viewer
+                                            playlist=response.response_text
+                                            base_url=response.request_url
+                                        />
+                                    },
+                                )
+                            }
+                            Err(error) => {
+                                Either::Right(
+                                    if let Some(extra_info) = error.extra_info {
+                                        view! { <ViewerError error=error.error extra_info /> }
+                                    } else {
+                                        view! { <ViewerError error=error.error /> }
+                                    },
+                                )
+                            }
+                        })
+                }}
+            </ErrorBoundary>
         </Suspense>
     }
 }

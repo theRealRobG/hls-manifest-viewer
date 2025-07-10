@@ -1,5 +1,6 @@
+use super::{BLANK_CLASS, COMMENT_CLASS, MAIN_VIEW_CLASS, TAG_CLASS, URI_CLASS};
 use crate::PLAYLIST_URL_QUERY_NAME;
-use leptos::{either::Either, prelude::*};
+use leptos::prelude::*;
 use m3u8::{
     config::ParsingOptionsBuilder,
     line::HlsLine,
@@ -13,59 +14,22 @@ use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use std::{error::Error, fmt::Display};
 use url::Url;
 
-const VIEWER_CLASS: &str = "viewer-content";
-const ERROR_CLASS: &str = "error";
-const TAG_CLASS: &str = "hls-line tag";
-const URI_CLASS: &str = "hls-line uri";
-const COMMENT_CLASS: &str = "hls-line comment";
-const BLANK_CLASS: &str = "hls-line blank";
-
 #[component]
-pub fn ViewerLoading() -> impl IntoView {
-    view! {
-        <div class=VIEWER_CLASS>
-            <p>"Loading..."</p>
-        </div>
-    }
-}
-
-#[component]
-pub fn ViewerError(error: String, #[prop(optional)] extra_info: Option<String>) -> impl IntoView {
-    view! {
-        <div class=VIEWER_CLASS>
-            {move || {
-                let error = error.to_owned();
-                let extra_info = extra_info.to_owned();
-                if let Some(extra_info) = extra_info {
-                    view! {
-                        <p class=ERROR_CLASS>{error}</p>
-                        <pre class=ERROR_CLASS>{extra_info}</pre>
-                    }
-                        .into_any()
-                } else {
-                    view! { <p class=ERROR_CLASS>{error}</p> }.into_any()
-                }
-            }}
-        </div>
-    }
-}
-
-#[component]
-pub fn Viewer(playlist: String, base_url: String) -> impl IntoView {
+pub fn PlaylistViewer(playlist: String, base_url: String) -> Result<impl IntoView, PlaylistError> {
     if playlist.is_empty() {
-        return Either::Left(view! { <div class=VIEWER_CLASS>{Vec::new()}</div> });
+        return Ok(view! { <div class=MAIN_VIEW_CLASS>{Vec::new()}</div> });
     }
     match try_get_lines(&playlist, &base_url) {
-        Ok(lines) => Either::Left(view! { <div class=VIEWER_CLASS>{lines}</div> }),
-        Err(error) => Either::Right(view! { <ViewerError error=error.to_string() /> }),
+        Ok(lines) => Ok(view! { <div class=MAIN_VIEW_CLASS>{lines}</div> }),
+        Err(error) => Err(error),
     }
 }
 
 #[derive(Debug)]
-enum ViewerError {
+pub enum PlaylistError {
     PlaylistIdentifierNotPresent,
 }
-impl Display for ViewerError {
+impl Display for PlaylistError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::PlaylistIdentifierNotPresent => {
@@ -74,9 +38,9 @@ impl Display for ViewerError {
         }
     }
 }
-impl Error for ViewerError {}
+impl Error for PlaylistError {}
 
-fn try_get_lines(playlist: &str, base_url: &str) -> Result<Vec<AnyView>, ViewerError> {
+fn try_get_lines(playlist: &str, base_url: &str) -> Result<Vec<AnyView>, PlaylistError> {
     // The base_url should never fail to parse. I _could_ create a separate flow in this case that
     // makes no attempt to insert links, but I feel that is an over-complication.
     let base_url = Url::parse(base_url).ok();
@@ -96,7 +60,7 @@ fn try_get_lines(playlist: &str, base_url: &str) -> Result<Vec<AnyView>, ViewerE
                 view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any(),
             );
         }
-        _ => return Err(ViewerError::PlaylistIdentifierNotPresent),
+        _ => return Err(PlaylistError::PlaylistIdentifierNotPresent),
     }
     while let Ok(Some(line)) = reader.read_line() {
         match line {
