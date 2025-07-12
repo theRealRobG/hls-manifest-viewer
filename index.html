@@ -4,6 +4,7 @@
 <head>
   <link data-trunk rel="icon" href="public/hls-manifest-viewer-logo.svg" type="image/svg+xml" />
   <link data-trunk rel="copy-file" href="public/github-mark-white.svg" type="image/svg+xml" />
+  <link data-trunk rel="copy-file" href="public/copy.svg" type="image/svg+xml" />
   <link data-trunk rel="rust" data-wasm-opt="z" data-weak-refs />
   <style>
     /* Page styles setup */
@@ -171,7 +172,23 @@
       margin-bottom: calc(var(--spacing) * 6);
     }
 
+    .viewer-main {
+      position: relative;
+    }
+
+    .viewer-content .copy-button {
+      position: absolute;
+      top: 0;
+      right: calc(var(--spacing));
+    }
+
+    .copy-button:active {
+      background-color: var(--color-sky-300);
+      border-color: var(--color-sky-300);
+    }
+
     .viewer-supplemental {
+      position: relative;
       border-style: solid;
       border-width: 1px;
       border-color: var(--color-stone-600);

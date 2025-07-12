@@ -3,12 +3,13 @@ use super::{
     MAIN_VIEW_WITH_SUPPLEMENTAL_CLASS, TAG_CLASS, URI_CLASS,
 };
 use crate::{
+    components::CopyButton,
     utils::query_codec::{
         MediaSegmentContext, SupplementalViewQueryContext, SUPPLEMENTAL_VIEW_QUERY_NAME,
     },
     PLAYLIST_URL_QUERY_NAME,
 };
-use leptos::prelude::*;
+use leptos::{either::EitherOf3, prelude::*};
 use m3u8::{
     config::ParsingOptionsBuilder,
     line::HlsLine,
@@ -30,14 +31,24 @@ pub fn PlaylistViewer(
     #[prop(optional)] highlighted_segment: Option<u64>,
 ) -> Result<impl IntoView, PlaylistError> {
     if playlist.is_empty() {
-        return Ok(view! { <div class=MAIN_VIEW_CLASS>{Vec::new()}</div> });
+        return Ok(EitherOf3::A(view! { <div class=MAIN_VIEW_CLASS /> }));
     }
     match try_get_lines(&playlist, &base_url, highlighted_segment) {
         Ok(lines) => {
             if supplemental_showing {
-                Ok(view! { <div class=MAIN_VIEW_WITH_SUPPLEMENTAL_CLASS>{lines}</div> })
+                Ok(EitherOf3::B(view! {
+                    <div class=MAIN_VIEW_WITH_SUPPLEMENTAL_CLASS>
+                        <CopyButton text=move || playlist.clone() />
+                        {lines}
+                    </div>
+                }))
             } else {
-                Ok(view! { <div class=MAIN_VIEW_CLASS>{lines}</div> })
+                Ok(EitherOf3::C(view! {
+                    <div class=MAIN_VIEW_CLASS>
+                        <CopyButton text=move || playlist.clone() />
+                        {lines}
+                    </div>
+                }))
             }
         }
         Err(error) => Err(error),
