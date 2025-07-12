@@ -35,6 +35,7 @@
       --color-sky-800: oklch(44.3% 0.11 240.79);
       --color-sky-900: oklch(39.1% 0.09 240.876);
       --color-sky-950: oklch(29.3% 0.066 243.157);
+      --color-stone-600: oklch(44.4% 0.011 73.639);
       --color-stone-800: oklch(26.8% 0.007 34.298);
       --color-stone-900: oklch(21.6% 0.006 56.043);
       --color-white: #fff;
@@ -160,13 +161,22 @@
 
     /* Styling for the HLS playlist viewer */
     .viewer-content {
+      display: flex;
       font-family: var(--font-mono);
       padding: calc(var(--spacing) * 3);
       background-color: var(--color-stone-800);
       color: var(--color-sky-100);
       overflow: scroll;
-      overflow-wrap: break-word;
+      overflow-wrap: anywhere;
       margin-bottom: calc(var(--spacing) * 6);
+    }
+
+    .viewer-supplemental {
+      border-style: solid;
+      border-width: 1px;
+      border-color: var(--color-stone-600);
+      padding: 2px;
+      margin-left: auto;
     }
 
     .viewer-content p,
@@ -180,6 +190,10 @@
     .viewer-content a {
       color: var(--color-sky-300);
       text-decoration-line: underline;
+    }
+
+    .viewer-content .highlighted {
+      background-color: var(--color-sky-800);
     }
 
     .viewer-content .hls-line.uri {

@@ -1,7 +1,10 @@
-use std::{fmt::Display, error::Error};
+use std::{error::Error, fmt::Display};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{js_sys::TypeError, DomException, Response};
+use web_sys::{
+    DomException, Response,
+    js_sys::{ArrayBuffer, TypeError, Uint8Array},
+};
 
 #[derive(Debug, Clone)]
 pub struct FetchTextResponse {
@@ -10,11 +13,19 @@ pub struct FetchTextResponse {
 }
 impl FetchTextResponse {
     fn empty(request_url: String) -> Self {
-        Self { request_url, response_text: String::new() }
+        Self {
+            request_url,
+            response_text: String::new(),
+        }
     }
 }
 
 #[derive(Debug, Clone)]
+pub struct FetchArrayBufferResonse {
+    pub response_body: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct FetchError {
     pub error: String,
     pub extra_info: Option<String>,
@@ -40,12 +51,33 @@ pub async fn fetch_text(request_url: String) -> Result<FetchTextResponse, FetchE
         .map_err(fetch_failed)?
         .as_string()
         .expect("text() on a fetch Response must provide a String");
-    Ok(FetchTextResponse { request_url, response_text })
+    Ok(FetchTextResponse {
+        request_url,
+        response_text,
+    })
+}
+
+pub async fn fetch_array_buffer(
+    request_url: String,
+) -> Result<FetchArrayBufferResonse, FetchError> {
+    let response = response_from(&request_url).await?;
+    let response_buf = JsFuture::from(response.array_buffer().map_err(fetch_failed)?)
+        .await
+        .map_err(fetch_failed)?;
+    let array_buf = response_buf
+        .dyn_into::<ArrayBuffer>()
+        .expect("array_buffer() on a fetch Response must provide an ArrayBuffer");
+    let data = Uint8Array::new(&array_buf);
+    let mut body = vec![0; data.length() as usize];
+    data.copy_to(&mut body);
+    Ok(FetchArrayBufferResonse {
+        response_body: body,
+    })
 }
 
 async fn response_from(request_url: &str) -> Result<Response, FetchError> {
     let window = web_sys::window().expect("Window must be defined");
-    let response = JsFuture::from(window.fetch_with_str(&request_url))
+    let response = JsFuture::from(window.fetch_with_str(request_url))
         .await
         .map_err(fetch_failed)?;
     let response: Response = response
@@ -57,12 +89,25 @@ async fn response_from(request_url: &str) -> Result<Response, FetchError> {
 
 fn fetch_failed(e: JsValue) -> FetchError {
     match e.dyn_into::<TypeError>() {
-        Ok(e) => FetchError { error: String::from(e.to_string()), extra_info: None },
+        Ok(e) => FetchError {
+            error: String::from(e.to_string()),
+            extra_info: None,
+        },
         Err(e) => match e.dyn_into::<DomException>() {
-            Ok(e) => FetchError { error: String::from(e.to_string()), extra_info: None },
-            Err(e) => FetchError { error: format!("Fetch failed: {e:?}"), extra_info: None },
+            Ok(e) => FetchError {
+                error: String::from(e.to_string()),
+                extra_info: None,
+            },
+            Err(e) => FetchError {
+                error: format!("Fetch failed: {e:?}"),
+                extra_info: None,
+            },
         },
     }
+}
+
+fn content_type_from(response: &Response) -> Option<String> {
+    response.headers().get("Content-Type").ok().flatten()
 }
 
 async fn validate(response: &Response) -> Result<(), FetchError> {
@@ -74,22 +119,34 @@ async fn validate(response: &Response) -> Result<(), FetchError> {
         response.status(),
         response.status_text()
     );
-    let Ok(Some(content_type)) = response.headers().get("Content-Type") else {
-        return Err(FetchError { error, extra_info: None });
+    let Some(content_type) = content_type_from(response) else {
+        return Err(FetchError {
+            error,
+            extra_info: None,
+        });
     };
     if content_type.contains("text/plain")
         || content_type.contains("application/json")
         || content_type.contains("application/x-www-form-urlencoded")
     {
         let Ok(response_text_promise) = response.text() else {
-            return Err(FetchError { error, extra_info: None });
+            return Err(FetchError {
+                error,
+                extra_info: None,
+            });
         };
         let Ok(text) = JsFuture::from(response_text_promise).await else {
-            return Err(FetchError { error, extra_info: None });
+            return Err(FetchError {
+                error,
+                extra_info: None,
+            });
         };
         let extra_info = text.as_string();
         Err(FetchError { error, extra_info })
     } else {
-        Err(FetchError { error, extra_info: None })
+        Err(FetchError {
+            error,
+            extra_info: None,
+        })
     }
 }

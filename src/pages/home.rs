@@ -1,14 +1,15 @@
 use crate::{
-    components::{UrlInputForm, Viewer, ViewerError, ViewerLoading},
-    utils::network::fetch_text,
     PLAYLIST_URL_QUERY_NAME,
+    components::{UrlInputForm, Viewer, ViewerLoading},
+    utils::{network::fetch_text, query_codec::SUPPLEMENTAL_VIEW_QUERY_NAME},
 };
-use leptos::{either::Either, prelude::*};
+use leptos::prelude::*;
 use leptos_router::hooks::query_signal;
 
 #[component]
 pub fn Home() -> impl IntoView {
     let (playlist_url, _) = query_signal::<String>(PLAYLIST_URL_QUERY_NAME);
+    let (supplemental_context, _) = query_signal::<String>(SUPPLEMENTAL_VIEW_QUERY_NAME);
     let playlist_result = LocalResource::new(move || {
         let playlist_url = playlist_url.get().unwrap_or_default();
         fetch_text(playlist_url)
@@ -23,43 +24,16 @@ pub fn Home() -> impl IntoView {
         </p>
         <UrlInputForm />
         <Suspense fallback=ViewerLoading>
-            <ErrorBoundary fallback=|errors| {
-                view! {
-                    {move || {
-                        errors
-                            .get()
-                            .into_iter()
-                            .map(|(_, error)| view! { <ViewerError error=error.to_string() /> })
-                            .collect::<Vec<_>>()
-                    }}
-                }
-            }>
-                {move || {
-                    playlist_result
-                        .get()
-                        .map(|result| match result {
-                            Ok(response) => {
-                                Either::Left(
-                                    view! {
-                                        <Viewer
-                                            playlist=response.response_text
-                                            base_url=response.request_url
-                                        />
-                                    },
-                                )
-                            }
-                            Err(error) => {
-                                Either::Right(
-                                    if let Some(extra_info) = error.extra_info {
-                                        view! { <ViewerError error=error.error extra_info /> }
-                                    } else {
-                                        view! { <ViewerError error=error.error /> }
-                                    },
-                                )
-                            }
-                        })
-                }}
-            </ErrorBoundary>
+            {move || {
+                let supplemental_context = move || supplemental_context.get();
+                playlist_result
+                    .get()
+                    .map(|fetch_response| {
+                        view! {
+                            <Viewer fetch_response supplemental_context=supplemental_context() />
+                        }
+                    })
+            }}
         </Suspense>
     }
 }
