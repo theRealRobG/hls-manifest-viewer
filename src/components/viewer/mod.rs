@@ -1,4 +1,5 @@
 mod error;
+mod isobmff;
 mod loading;
 mod playlist;
 mod preformatted;
@@ -9,6 +10,7 @@ use crate::utils::{
     response::{determine_segment_type, SegmentType},
 };
 use error::ViewerError;
+use isobmff::IsobmffViewer;
 use leptos::prelude::*;
 pub use loading::ViewerLoading;
 use playlist::PlaylistViewer;
@@ -91,49 +93,51 @@ pub fn Viewer(
                     <Suspense fallback=|| {
                         view! { <div class=SUPPLEMENTAL_VIEW_CLASS>"Loading..."</div> }
                     }>
-                        {move || {
-                            segment_result
-                                .get()
-                                .map(|fetch_response| {
-                                    match fetch_response {
-                                        Ok(r) => {
-                                            match determine_segment_type(&r) {
-                                                SegmentType::WebVtt => {
-                                                    view! {
-                                                        <PreformattedViewer contents=String::from_utf8_lossy(
-                                                                &r.response_body,
-                                                            )
-                                                            .to_string() />
-                                                    }
-                                                        .into_any()
-                                                }
-                                                SegmentType::Mp4 => {
-                                                    view! { <p>"Work in progress"</p> }.into_any()
-                                                }
-                                                SegmentType::Unknown => {
-                                                    view! {
-                                                        <div class=SUPPLEMENTAL_VIEW_CLASS>
-                                                            <ViewerError
-                                                                error="Error: unsupported segment type".to_string()
-                                                                extra_info=Some(
-                                                                    "Currently only WebVTT segments are supported".to_string(),
+                        <ErrorBounded>
+                            {move || {
+                                segment_result
+                                    .get()
+                                    .map(|fetch_response| {
+                                        match fetch_response {
+                                            Ok(r) => {
+                                                match determine_segment_type(&r) {
+                                                    SegmentType::WebVtt => {
+                                                        view! {
+                                                            <PreformattedViewer contents=String::from_utf8_lossy(
+                                                                    &r.response_body,
                                                                 )
-                                                            />
-                                                        </div>
+                                                                .to_string() />
+                                                        }
+                                                            .into_any()
                                                     }
-                                                        .into_any()
+                                                    SegmentType::Mp4 => {
+                                                        view! { <IsobmffViewer data=r.response_body /> }.into_any()
+                                                    }
+                                                    SegmentType::Unknown => {
+                                                        view! {
+                                                            <div class=SUPPLEMENTAL_VIEW_CLASS>
+                                                                <ViewerError
+                                                                    error="Error: unsupported segment type".to_string()
+                                                                    extra_info=Some(
+                                                                        "Currently only WebVTT segments are supported".to_string(),
+                                                                    )
+                                                                />
+                                                            </div>
+                                                        }
+                                                            .into_any()
+                                                    }
                                                 }
                                             }
-                                        }
-                                        Err(e) => {
-                                            view! {
-                                                <ViewerError error=e.error extra_info=e.extra_info />
+                                            Err(e) => {
+                                                view! {
+                                                    <ViewerError error=e.error extra_info=e.extra_info />
+                                                }
+                                                    .into_any()
                                             }
-                                                .into_any()
                                         }
-                                    }
-                                })
-                        }}
+                                    })
+                            }}
+                        </ErrorBounded>
                     </Suspense>
                 </Container>
             }
