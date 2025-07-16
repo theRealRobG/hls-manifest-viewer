@@ -21,6 +21,7 @@ wasm-bindgen-futures = "0.4"
 url = "2.5"
 percent-encoding = "2.3"
 leptos-use = { version = "0.16", features = ["use_clipboard"] }
+mp4-atom = "0.8.1"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

@@ -4,8 +4,9 @@ mod playlist;
 mod preformatted;
 
 use crate::utils::{
-    network::{FetchArrayBufferResonse, FetchError, FetchTextResponse, fetch_array_buffer},
+    network::{fetch_array_buffer, FetchError, FetchTextResponse},
     query_codec::{MediaSegmentContext, SupplementalViewQueryContext},
+    response::{determine_segment_type, SegmentType},
 };
 use error::ViewerError;
 use leptos::prelude::*;
@@ -106,6 +107,9 @@ pub fn Viewer(
                                                     }
                                                         .into_any()
                                                 }
+                                                SegmentType::Mp4 => {
+                                                    view! { <p>"Work in progress"</p> }.into_any()
+                                                }
                                                 SegmentType::Unknown => {
                                                     view! {
                                                         <div class=SUPPLEMENTAL_VIEW_CLASS>
@@ -159,18 +163,4 @@ fn ErrorBounded(children: Children) -> impl IntoView {
 #[component]
 fn Container(children: Children) -> impl IntoView {
     view! { <div class=VIEWER_CLASS>{children()}</div> }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum SegmentType {
-    WebVtt,
-    Unknown,
-}
-
-fn determine_segment_type(response: &FetchArrayBufferResonse) -> SegmentType {
-    if response.response_body.get(5) == Some(&b'T') && &response.response_body[..6] == b"WEBVTT" {
-        SegmentType::WebVtt
-    } else {
-        SegmentType::Unknown
-    }
 }
