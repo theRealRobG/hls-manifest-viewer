@@ -83,6 +83,7 @@ fn try_get_lines(
         ParsingOptionsBuilder::new()
             .with_parsing_for_m3u()
             .with_parsing_for_media()
+            .with_parsing_for_media_sequence()
             .with_parsing_for_i_frame_stream_inf()
             .build(),
     );
@@ -121,6 +122,13 @@ fn try_get_lines(
                         let uri = iframe_stream_inf.uri().to_string();
                         let tag_inner = iframe_stream_inf.into_inner();
                         lines.push(view_from_uri_tag(uri, tag_inner, &base_url));
+                    }
+                    hls::Tag::MediaSequence(tag) => {
+                        media_sequence = tag.media_sequence();
+                        let line = tag.into_inner();
+                        lines.push(
+                            view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any()
+                        );
                     }
                     tag => {
                         let line = tag.into_inner();
