@@ -13,7 +13,7 @@ use error::ViewerError;
 use isobmff::IsobmffViewer;
 use leptos::prelude::*;
 pub use loading::ViewerLoading;
-use playlist::PlaylistViewer;
+use playlist::{HighlightedMapInfo, PlaylistViewer};
 use preformatted::PreformattedViewer;
 
 const VIEWER_CLASS: &str = "viewer-content";
@@ -25,6 +25,7 @@ const TAG_CLASS: &str = "hls-line tag";
 const URI_CLASS: &str = "hls-line uri";
 const COMMENT_CLASS: &str = "hls-line comment";
 const BLANK_CLASS: &str = "hls-line blank";
+const HIGHLIGHTED: &str = "highlighted";
 const HIGHLIGHTED_URI_CLASS: &str = "hls-line uri highlighted";
 
 #[component]
@@ -79,7 +80,6 @@ pub fn Viewer(
                 url,
                 media_sequence,
             } = media_segment_context;
-            let segment_result = LocalResource::new(move || fetch_array_buffer(url.clone()));
             view! {
                 <Container>
                     <ErrorBounded>
@@ -90,62 +90,36 @@ pub fn Viewer(
                             highlighted_segment=media_sequence
                         />
                     </ErrorBounded>
-                    <Suspense fallback=|| {
-                        view! { <div class=SUPPLEMENTAL_VIEW_CLASS>"Loading..."</div> }
-                    }>
-                        <ErrorBounded>
-                            {move || {
-                                segment_result
-                                    .get()
-                                    .map(|fetch_response| {
-                                        match fetch_response {
-                                            Ok(r) => {
-                                                match determine_segment_type(&r) {
-                                                    SegmentType::WebVtt => {
-                                                        view! {
-                                                            <PreformattedViewer contents=String::from_utf8_lossy(
-                                                                    &r.response_body,
-                                                                )
-                                                                .to_string() />
-                                                        }
-                                                            .into_any()
-                                                    }
-                                                    SegmentType::Mp4 => {
-                                                        view! { <IsobmffViewer data=r.response_body /> }.into_any()
-                                                    }
-                                                    SegmentType::Unknown => {
-                                                        view! {
-                                                            <div class=SUPPLEMENTAL_VIEW_CLASS>
-                                                                <ViewerError
-                                                                    error="Error: unsupported segment type".to_string()
-                                                                    extra_info=Some(
-                                                                        "Currently only WebVTT segments are supported".to_string(),
-                                                                    )
-                                                                />
-                                                            </div>
-                                                        }
-                                                            .into_any()
-                                                    }
-                                                }
-                                            }
-                                            Err(e) => {
-                                                view! {
-                                                    <ViewerError error=e.error extra_info=e.extra_info />
-                                                }
-                                                    .into_any()
-                                            }
-                                        }
-                                    })
-                            }}
-                        </ErrorBounded>
-                    </Suspense>
+                    <SupplementalSegmentView segment_url=url.clone() />
+                </Container>
+            }
+        }
+        SupplementalViewQueryContext::Map(media_segment_context) => {
+            let MediaSegmentContext {
+                url,
+                media_sequence,
+            } = media_segment_context;
+            let url_for_playlist_viewer = url.clone();
+            let url_for_segment_viewer = url.clone();
+            view! {
+                <Container>
+                    <ErrorBounded>
+                        <PlaylistViewer
+                            playlist
+                            base_url
+                            supplemental_showing=true
+                            highlighted_map_info=HighlightedMapInfo {
+                                url: url_for_playlist_viewer,
+                                min_media_sequence: media_sequence,
+                            }
+                        />
+                    </ErrorBounded>
+                    <SupplementalSegmentView segment_url=url_for_segment_viewer />
                 </Container>
             }
         }
     }
 }
-
-// Option<Result<SupplementalViewData, SupplementalResourceFailure>>
 
 #[component]
 fn ErrorBounded(children: Children) -> impl IntoView {
@@ -167,4 +141,59 @@ fn ErrorBounded(children: Children) -> impl IntoView {
 #[component]
 fn Container(children: Children) -> impl IntoView {
     view! { <div class=VIEWER_CLASS>{children()}</div> }
+}
+
+#[component]
+fn SupplementalSegmentView(segment_url: String) -> impl IntoView {
+    let segment_result = LocalResource::new(move || fetch_array_buffer(segment_url.clone()));
+    view! {
+        <Suspense fallback=|| {
+            view! { <div class=SUPPLEMENTAL_VIEW_CLASS>"Loading..."</div> }
+        }>
+            <ErrorBounded>
+                {move || {
+                    segment_result
+                        .get()
+                        .map(|fetch_response| {
+                            match fetch_response {
+                                Ok(r) => {
+                                    match determine_segment_type(&r) {
+                                        SegmentType::WebVtt => {
+                                            view! {
+                                                <PreformattedViewer contents=String::from_utf8_lossy(
+                                                        &r.response_body,
+                                                    )
+                                                    .to_string() />
+                                            }
+                                                .into_any()
+                                        }
+                                        SegmentType::Mp4 => {
+                                            view! { <IsobmffViewer data=r.response_body /> }.into_any()
+                                        }
+                                        SegmentType::Unknown => {
+                                            view! {
+                                                <div class=SUPPLEMENTAL_VIEW_CLASS>
+                                                    <ViewerError
+                                                        error="Error: unsupported segment type".to_string()
+                                                        extra_info=Some(
+                                                            "Currently only WebVTT and Fragmented MPEG-4 segments are supported"
+                                                                .to_string(),
+                                                        )
+                                                    />
+                                                </div>
+                                            }
+                                                .into_any()
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    view! { <ViewerError error=e.error extra_info=e.extra_info /> }
+                                        .into_any()
+                                }
+                            }
+                        })
+                }}
+            </ErrorBounded>
+        </Suspense>
+    }
 }

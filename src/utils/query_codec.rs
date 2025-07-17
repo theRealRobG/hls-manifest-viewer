@@ -11,13 +11,31 @@ pub struct MediaSegmentContext {
 #[derive(Debug, Clone, PartialEq)]
 pub enum SupplementalViewQueryContext {
     Segment(MediaSegmentContext),
+    Map(MediaSegmentContext),
 }
 
 impl SupplementalViewQueryContext {
     pub fn encode(&self) -> String {
         match self {
             Self::Segment(c) => format!("SEGMENT,{},{}", c.media_sequence, c.url),
+            Self::Map(c) => format!("MAP,{},{}", c.media_sequence, c.url),
         }
+    }
+
+    pub fn encode_segment(url: String, media_sequence: u64) -> String {
+        Self::Segment(MediaSegmentContext {
+            url,
+            media_sequence,
+        })
+        .encode()
+    }
+
+    pub fn encode_map(url: String, media_sequence: u64) -> String {
+        Self::Map(MediaSegmentContext {
+            url,
+            media_sequence,
+        })
+        .encode()
     }
 
     pub fn try_decode(value: &str) -> Result<Self, SupplementalViewQueryContextDecodeError> {
@@ -30,7 +48,13 @@ impl SupplementalViewQueryContext {
                 let Some(value) = split.next() else {
                     return Err(SupplementalViewQueryContextDecodeError::EmptyContextValue);
                 };
-                Self::try_decode_segment_context(value)
+                Ok(Self::Segment(Self::try_decode_segment_context(value)?))
+            }
+            "MAP" => {
+                let Some(value) = split.next() else {
+                    return Err(SupplementalViewQueryContextDecodeError::EmptyContextValue);
+                };
+                Ok(Self::Map(Self::try_decode_segment_context(value)?))
             }
             _ => Err(SupplementalViewQueryContextDecodeError::UnknownContextType(
                 type_part.to_string(),
@@ -40,7 +64,7 @@ impl SupplementalViewQueryContext {
 
     fn try_decode_segment_context(
         value: &str,
-    ) -> Result<Self, SupplementalViewQueryContextDecodeError> {
+    ) -> Result<MediaSegmentContext, SupplementalViewQueryContextDecodeError> {
         let mut split = value.splitn(2, ',');
         let Some(media_sequence_part) = split.next() else {
             return Err(SupplementalViewQueryContextDecodeError::MissingMediaSequencePart);
@@ -51,10 +75,10 @@ impl SupplementalViewQueryContext {
         let Some(url) = split.next().map(str::to_string) else {
             return Err(SupplementalViewQueryContextDecodeError::MissingUrlPart);
         };
-        Ok(Self::Segment(MediaSegmentContext {
+        Ok(MediaSegmentContext {
             url,
             media_sequence,
-        }))
+        })
     }
 }
 

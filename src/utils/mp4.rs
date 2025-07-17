@@ -159,15 +159,11 @@ pub struct TablePropertyValue {
     pub rows: Vec<Vec<BasicPropertyValue>>,
 }
 
-pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
-    let size = AtomPropertyValue::Basic(header.size.map(BasicPropertyValue::Usize).unwrap_or(
-        BasicPropertyValue::String(String::from("Extends to end of file")),
-    ));
+pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
     match atom {
         Any::Ftyp(ftyp) => AtomProperties {
             box_name: "FileTypeBox",
             properties: vec![
-                ("size", size),
                 ("major_brand", AtomPropertyValue::from(ftyp.major_brand)),
                 ("minor_version", AtomPropertyValue::from(ftyp.minor_version)),
                 (
@@ -179,7 +175,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Styp(styp) => AtomProperties {
             box_name: "SegmentTypeBox",
             properties: vec![
-                ("size", size),
                 ("major_brand", AtomPropertyValue::from(styp.major_brand)),
                 ("minor_version", AtomPropertyValue::from(styp.minor_version)),
                 (
@@ -191,101 +186,88 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Hdlr(hdlr) => AtomProperties {
             box_name: "HandlerBox",
             properties: vec![
-                ("size", size),
                 ("handler", AtomPropertyValue::from(hdlr.handler)),
                 ("name", AtomPropertyValue::from(&hdlr.name)),
             ],
         },
         Any::Pitm(pitm) => AtomProperties {
             box_name: "PrimaryItemBox",
-            properties: vec![
-                ("size", size),
-                ("item_id", AtomPropertyValue::from(pitm.item_id)),
-            ],
+            properties: vec![("item_id", AtomPropertyValue::from(pitm.item_id))],
         },
         Any::Iloc(iloc) => AtomProperties {
             box_name: "ItemLocationBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "item_locations",
-                    AtomPropertyValue::Table(TablePropertyValue {
-                        headers: Some(vec![
-                            "item_id",
-                            "construction_method",
-                            "data_reference_index",
-                            "base_offset",
-                            "extents",
-                        ]),
-                        rows: iloc
-                            .item_locations
-                            .iter()
-                            .map(|iloc| {
-                                vec![
-                                    BasicPropertyValue::from(iloc.item_id),
-                                    BasicPropertyValue::from(iloc.construction_method),
-                                    BasicPropertyValue::from(iloc.data_reference_index),
-                                    BasicPropertyValue::from(iloc.base_offset),
-                                    BasicPropertyValue::from(
-                                        iloc.extents
-                                            .iter()
-                                            .map(|ext| {
-                                                format!(
-                                                    "({},{},{})",
-                                                    ext.item_reference_index,
-                                                    ext.offset,
-                                                    ext.length
-                                                )
-                                            })
-                                            .collect::<Vec<String>>()
-                                            .join(", "),
-                                    ),
-                                ]
-                            })
-                            .collect(),
-                    }),
-                ),
-            ],
+            properties: vec![(
+                "item_locations",
+                AtomPropertyValue::Table(TablePropertyValue {
+                    headers: Some(vec![
+                        "item_id",
+                        "construction_method",
+                        "data_reference_index",
+                        "base_offset",
+                        "extents",
+                    ]),
+                    rows: iloc
+                        .item_locations
+                        .iter()
+                        .map(|iloc| {
+                            vec![
+                                BasicPropertyValue::from(iloc.item_id),
+                                BasicPropertyValue::from(iloc.construction_method),
+                                BasicPropertyValue::from(iloc.data_reference_index),
+                                BasicPropertyValue::from(iloc.base_offset),
+                                BasicPropertyValue::from(
+                                    iloc.extents
+                                        .iter()
+                                        .map(|ext| {
+                                            format!(
+                                                "({},{},{})",
+                                                ext.item_reference_index, ext.offset, ext.length
+                                            )
+                                        })
+                                        .collect::<Vec<String>>()
+                                        .join(", "),
+                                ),
+                            ]
+                        })
+                        .collect(),
+                }),
+            )],
         },
         Any::Iinf(iinf) => AtomProperties {
             box_name: "ItemInfoBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "item_infos",
-                    AtomPropertyValue::Table(TablePropertyValue {
-                        headers: Some(vec![
-                            "item_id",
-                            "item_protection_index",
-                            "item_type",
-                            "item_name",
-                            "content_type",
-                            "content_encoding",
-                            "item_not_in_presentation",
-                        ]),
-                        rows: iinf
-                            .item_infos
-                            .iter()
-                            .map(|iinf| {
-                                vec![
-                                    BasicPropertyValue::from(iinf.item_id),
-                                    BasicPropertyValue::from(iinf.item_protection_index),
-                                    BasicPropertyValue::from(iinf.item_type),
-                                    BasicPropertyValue::from(&iinf.item_name),
-                                    BasicPropertyValue::from(iinf.content_type.as_ref()),
-                                    BasicPropertyValue::from(iinf.content_encoding.as_ref()),
-                                    BasicPropertyValue::from(iinf.item_not_in_presentation),
-                                ]
-                            })
-                            .collect(),
-                    }),
-                ),
-            ],
+            properties: vec![(
+                "item_infos",
+                AtomPropertyValue::Table(TablePropertyValue {
+                    headers: Some(vec![
+                        "item_id",
+                        "item_protection_index",
+                        "item_type",
+                        "item_name",
+                        "content_type",
+                        "content_encoding",
+                        "item_not_in_presentation",
+                    ]),
+                    rows: iinf
+                        .item_infos
+                        .iter()
+                        .map(|iinf| {
+                            vec![
+                                BasicPropertyValue::from(iinf.item_id),
+                                BasicPropertyValue::from(iinf.item_protection_index),
+                                BasicPropertyValue::from(iinf.item_type),
+                                BasicPropertyValue::from(&iinf.item_name),
+                                BasicPropertyValue::from(iinf.content_type.as_ref()),
+                                BasicPropertyValue::from(iinf.content_encoding.as_ref()),
+                                BasicPropertyValue::from(iinf.item_not_in_presentation),
+                            ]
+                        })
+                        .collect(),
+                }),
+            )],
         },
         Any::Auxc(auxc) => AtomProperties {
             box_name: "AuxiliaryTypeProperty",
             properties: vec![
-                ("size", size),
                 ("aux_type", AtomPropertyValue::from(&auxc.aux_type)),
                 ("aux_subtype", AtomPropertyValue::from(&auxc.aux_subtype)),
             ],
@@ -293,7 +275,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Clap(clap) => AtomProperties {
             box_name: "CleanApertureBox",
             properties: vec![
-                ("size", size),
                 (
                     "clean_aperture_width_n",
                     AtomPropertyValue::from(clap.clean_aperture_width_n),
@@ -318,19 +299,15 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         },
         Any::Imir(imir) => AtomProperties {
             box_name: "ImageMirror",
-            properties: vec![("size", size), ("axis", AtomPropertyValue::from(imir.axis))],
+            properties: vec![("axis", AtomPropertyValue::from(imir.axis))],
         },
         Any::Irot(irot) => AtomProperties {
             box_name: "ImageRotation",
-            properties: vec![
-                ("size", size),
-                ("angle", AtomPropertyValue::from(irot.angle)),
-            ],
+            properties: vec![("angle", AtomPropertyValue::from(irot.angle))],
         },
         Any::Iscl(iscl) => AtomProperties {
             box_name: "ImageScaling",
             properties: vec![
-                ("size", size),
                 (
                     "target_width_numerator",
                     AtomPropertyValue::from(iscl.target_width_numerator),
@@ -352,126 +329,109 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Ispe(ispe) => AtomProperties {
             box_name: "ImageSpatialExtentProperty",
             properties: vec![
-                ("size", size),
                 ("width", AtomPropertyValue::from(ispe.width)),
                 ("height", AtomPropertyValue::from(ispe.height)),
             ],
         },
         Any::Pixi(pixi) => AtomProperties {
             box_name: "PixelInformationProperty",
-            properties: vec![
-                ("size", size),
-                (
-                    "bits_per_channel",
-                    AtomPropertyValue::from(
-                        pixi.bits_per_channel
-                            .iter()
-                            .map(|bits| format!("{bits}"))
-                            .collect::<Vec<String>>()
-                            .join(", "),
-                    ),
+            properties: vec![(
+                "bits_per_channel",
+                AtomPropertyValue::from(
+                    pixi.bits_per_channel
+                        .iter()
+                        .map(|bits| format!("{bits}"))
+                        .collect::<Vec<String>>()
+                        .join(", "),
                 ),
-            ],
+            )],
         },
         Any::Rref(rref) => AtomProperties {
             box_name: "RequiredReferenceTypesProperty",
-            properties: vec![
-                ("size", size),
-                (
-                    "reference_types",
-                    AtomPropertyValue::from(&rref.reference_types),
-                ),
-            ],
+            properties: vec![(
+                "reference_types",
+                AtomPropertyValue::from(&rref.reference_types),
+            )],
         },
         Any::Ipma(ipma) => AtomProperties {
             box_name: "ItemPropertyAssociationBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "item_properties",
-                    AtomPropertyValue::Table(TablePropertyValue {
-                        headers: Some(vec!["item_id", "associations"]),
-                        rows: ipma
-                            .item_properties
-                            .iter()
-                            .map(|ipma| {
-                                vec![
-                                    BasicPropertyValue::from(ipma.item_id),
-                                    BasicPropertyValue::from(
-                                        ipma.associations
-                                            .iter()
-                                            .map(|assoc| {
-                                                format!(
-                                                    "(essential: {}, property_index: {})",
-                                                    assoc.essential, assoc.property_index
-                                                )
-                                            })
-                                            .collect::<Vec<String>>()
-                                            .join(", "),
-                                    ),
-                                ]
-                            })
-                            .collect(),
-                    }),
-                ),
-            ],
+            properties: vec![(
+                "item_properties",
+                AtomPropertyValue::Table(TablePropertyValue {
+                    headers: Some(vec!["item_id", "associations"]),
+                    rows: ipma
+                        .item_properties
+                        .iter()
+                        .map(|ipma| {
+                            vec![
+                                BasicPropertyValue::from(ipma.item_id),
+                                BasicPropertyValue::from(
+                                    ipma.associations
+                                        .iter()
+                                        .map(|assoc| {
+                                            format!(
+                                                "(essential: {}, property_index: {})",
+                                                assoc.essential, assoc.property_index
+                                            )
+                                        })
+                                        .collect::<Vec<String>>()
+                                        .join(", "),
+                                ),
+                            ]
+                        })
+                        .collect(),
+                }),
+            )],
         },
         Any::Iref(iref) => AtomProperties {
             box_name: "ItemReferenceBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "references",
-                    AtomPropertyValue::Table(TablePropertyValue {
-                        headers: Some(vec!["reference_type", "from_item_id", "to_item_ids"]),
-                        rows: iref
-                            .references
-                            .iter()
-                            .map(|iref| {
-                                vec![
-                                    BasicPropertyValue::from(iref.reference_type),
-                                    BasicPropertyValue::from(iref.from_item_id),
-                                    BasicPropertyValue::from(
-                                        iref.to_item_ids
-                                            .iter()
-                                            .map(|id| format!("{id}"))
-                                            .collect::<Vec<String>>()
-                                            .join(", "),
-                                    ),
-                                ]
-                            })
-                            .collect(),
-                    }),
-                ),
-            ],
+            properties: vec![(
+                "references",
+                AtomPropertyValue::Table(TablePropertyValue {
+                    headers: Some(vec!["reference_type", "from_item_id", "to_item_ids"]),
+                    rows: iref
+                        .references
+                        .iter()
+                        .map(|iref| {
+                            vec![
+                                BasicPropertyValue::from(iref.reference_type),
+                                BasicPropertyValue::from(iref.from_item_id),
+                                BasicPropertyValue::from(
+                                    iref.to_item_ids
+                                        .iter()
+                                        .map(|id| format!("{id}"))
+                                        .collect::<Vec<String>>()
+                                        .join(", "),
+                                ),
+                            ]
+                        })
+                        .collect(),
+                }),
+            )],
         },
         Any::Idat(idat) => AtomProperties {
             box_name: "ItemDataBox",
-            properties: vec![
-                ("size", size),
-                ("data", AtomPropertyValue::from(&idat.data)),
-            ],
+            properties: vec![("data", AtomPropertyValue::from(&idat.data))],
         },
         Any::Covr(covr) => AtomProperties {
             box_name: "Covr MetadataItem",
-            properties: vec![("size", size), ("covr", AtomPropertyValue::from(&covr.0))],
+            properties: vec![("covr", AtomPropertyValue::from(&covr.0))],
         },
         Any::Desc(desc) => AtomProperties {
             box_name: "Desc MetadataItem",
-            properties: vec![("size", size), ("desc", AtomPropertyValue::from(&desc.0))],
+            properties: vec![("desc", AtomPropertyValue::from(&desc.0))],
         },
         Any::Name(name) => AtomProperties {
             box_name: "Name MetadataItem",
-            properties: vec![("size", size), ("name", AtomPropertyValue::from(&name.0))],
+            properties: vec![("name", AtomPropertyValue::from(&name.0))],
         },
         Any::Year(year) => AtomProperties {
             box_name: "Year MetadataItem",
-            properties: vec![("size", size), ("year", AtomPropertyValue::from(&year.0))],
+            properties: vec![("year", AtomPropertyValue::from(&year.0))],
         },
         Any::Mvhd(mvhd) => AtomProperties {
             box_name: "MovieHeaderBox",
             properties: vec![
-                ("size", size),
                 ("creation_time", AtomPropertyValue::from(mvhd.creation_time)),
                 (
                     "modification_time",
@@ -513,7 +473,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Tkhd(tkhd) => AtomProperties {
             box_name: "TrackHeaderBox",
             properties: vec![
-                ("size", size),
                 ("creation_time", AtomPropertyValue::from(tkhd.creation_time)),
                 (
                     "modification_time",
@@ -567,7 +526,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Mdhd(mdhd) => AtomProperties {
             box_name: "MediaHeaderBox",
             properties: vec![
-                ("size", size),
                 ("creation_time", AtomPropertyValue::from(mdhd.creation_time)),
                 (
                     "modification_time",
@@ -581,7 +539,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Avcc(avcc) => AtomProperties {
             box_name: "AVCConfigurationBox",
             properties: vec![
-                ("size", size),
                 (
                     "configuration_version",
                     AtomPropertyValue::from(avcc.configuration_version),
@@ -656,7 +613,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Btrt(btrt) => AtomProperties {
             box_name: "BitRateBox",
             properties: vec![
-                ("size", size),
                 (
                     "buffer_size_db",
                     AtomPropertyValue::from(btrt.buffer_size_db),
@@ -668,7 +624,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Ccst(ccst) => AtomProperties {
             box_name: "CodingConstraintsBox",
             properties: vec![
-                ("size", size),
                 (
                     "all_ref_pics_intra",
                     AtomPropertyValue::from(ccst.all_ref_pics_intra),
@@ -692,7 +647,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
                     matrix_coefficients,
                     full_range_flag,
                 } => vec![
-                    ("size", size),
                     ("colour_type", AtomPropertyValue::from("nclx")),
                     (
                         "colour_primaries",
@@ -709,12 +663,10 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
                     ("full_range_flag", AtomPropertyValue::from(*full_range_flag)),
                 ],
                 mp4_atom::Colr::Ricc { profile } => vec![
-                    ("size", size),
                     ("colour_type", AtomPropertyValue::from("ricc")),
                     ("profile", AtomPropertyValue::from(profile)),
                 ],
                 mp4_atom::Colr::Prof { profile } => vec![
-                    ("size", size),
                     ("colour_type", AtomPropertyValue::from("prof")),
                     ("profile", AtomPropertyValue::from(profile)),
                 ],
@@ -723,7 +675,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Pasp(pasp) => AtomProperties {
             box_name: "PixelAspectRatioBox",
             properties: vec![
-                ("size", size),
                 ("h_spacing", AtomPropertyValue::from(pasp.h_spacing)),
                 ("v_spacing", AtomPropertyValue::from(pasp.v_spacing)),
             ],
@@ -731,7 +682,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Taic(taic) => AtomProperties {
             box_name: "TAIClockInfoBox",
             properties: vec![
-                ("size", size),
                 (
                     "time_uncertainty",
                     AtomPropertyValue::from(taic.time_uncertainty),
@@ -758,7 +708,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Hvcc(hvcc) => AtomProperties {
             box_name: "HEVCConfigurationBox",
             properties: vec![
-                ("size", size),
                 (
                     "configuration_version",
                     AtomPropertyValue::from(hvcc.configuration_version),
@@ -860,7 +809,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Esds(esds) => AtomProperties {
             box_name: "ElementaryStreamDescriptorBox",
             properties: vec![
-                ("size", size),
                 ("es_id", AtomPropertyValue::from(esds.es_desc.es_id)),
                 (
                     "decoder_config_object_type_indication",
@@ -903,7 +851,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Tx3g(tx3g) => AtomProperties {
             box_name: "3GPP Timed Text",
             properties: vec![
-                ("size", size),
                 (
                     "data_reference_index",
                     AtomPropertyValue::from(tx3g.data_reference_index),
@@ -946,7 +893,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::VpcC(vpc_c) => AtomProperties {
             box_name: "VPCodecConfigurationBox",
             properties: vec![
-                ("size", size),
                 ("profile", AtomPropertyValue::from(vpc_c.profile)),
                 ("level", AtomPropertyValue::from(vpc_c.level)),
                 ("bit_depth", AtomPropertyValue::from(vpc_c.bit_depth)),
@@ -981,7 +927,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Av1c(av1c) => AtomProperties {
             box_name: "AV1CodecConfigurationBox",
             properties: vec![
-                ("size", size),
                 ("seq_profile", AtomPropertyValue::from(av1c.seq_profile)),
                 (
                     "seq_level_idx_0",
@@ -1016,7 +961,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Dops(dops) => AtomProperties {
             box_name: "OpusSpecificBox",
             properties: vec![
-                ("size", size),
                 (
                     "output_channel_count",
                     AtomPropertyValue::from(dops.output_channel_count),
@@ -1031,33 +975,29 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         },
         Any::Cmpd(cmpd) => AtomProperties {
             box_name: "ComponentDefinitionBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "components",
-                    AtomPropertyValue::Table(TablePropertyValue {
-                        headers: Some(vec!["type", "type_uri"]),
-                        rows: cmpd
-                            .components
-                            .iter()
-                            .map(|c| {
-                                vec![
-                                    BasicPropertyValue::from(c.component_type),
-                                    BasicPropertyValue::from(c.component_type_uri.as_ref()),
-                                ]
-                            })
-                            .collect(),
-                    }),
-                ),
-            ],
+            properties: vec![(
+                "components",
+                AtomPropertyValue::Table(TablePropertyValue {
+                    headers: Some(vec!["type", "type_uri"]),
+                    rows: cmpd
+                        .components
+                        .iter()
+                        .map(|c| {
+                            vec![
+                                BasicPropertyValue::from(c.component_type),
+                                BasicPropertyValue::from(c.component_type_uri.as_ref()),
+                            ]
+                        })
+                        .collect(),
+                }),
+            )],
         },
         Any::UncC(unc_c) => AtomProperties {
             box_name: "UncompressedFrameConfigBox",
             properties: match unc_c {
-                mp4_atom::UncC::V1 { profile } => vec![
-                    ("size", size),
-                    ("profile", AtomPropertyValue::from(*profile)),
-                ],
+                mp4_atom::UncC::V1 { profile } => {
+                    vec![("profile", AtomPropertyValue::from(*profile))]
+                }
                 mp4_atom::UncC::V0 {
                     profile,
                     components,
@@ -1075,7 +1015,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
                     num_tile_cols_minus_one,
                     num_tile_rows_minus_one,
                 } => vec![
-                    ("size", size),
                     ("profile", AtomPropertyValue::from(*profile)),
                     (
                         "components",
@@ -1129,57 +1068,50 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         },
         Any::Stts(stts) => AtomProperties {
             box_name: "TimeToSampleBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "entries",
-                    AtomPropertyValue::Table(TablePropertyValue {
-                        headers: Some(vec!["count", "delta"]),
-                        rows: stts
-                            .entries
-                            .iter()
-                            .map(|entry| {
-                                vec![
-                                    BasicPropertyValue::from(entry.sample_count),
-                                    BasicPropertyValue::from(entry.sample_delta),
-                                ]
-                            })
-                            .collect(),
-                    }),
-                ),
-            ],
+            properties: vec![(
+                "entries",
+                AtomPropertyValue::Table(TablePropertyValue {
+                    headers: Some(vec!["count", "delta"]),
+                    rows: stts
+                        .entries
+                        .iter()
+                        .map(|entry| {
+                            vec![
+                                BasicPropertyValue::from(entry.sample_count),
+                                BasicPropertyValue::from(entry.sample_delta),
+                            ]
+                        })
+                        .collect(),
+                }),
+            )],
         },
         Any::Stsc(stsc) => AtomProperties {
             box_name: "SampleToChunkBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "entries",
-                    AtomPropertyValue::Table(TablePropertyValue {
-                        headers: Some(vec![
-                            "first_chunk",
-                            "samples_per_chunk",
-                            "sample_description_index",
-                        ]),
-                        rows: stsc
-                            .entries
-                            .iter()
-                            .map(|entry| {
-                                vec![
-                                    BasicPropertyValue::from(entry.first_chunk),
-                                    BasicPropertyValue::from(entry.samples_per_chunk),
-                                    BasicPropertyValue::from(entry.sample_description_index),
-                                ]
-                            })
-                            .collect(),
-                    }),
-                ),
-            ],
+            properties: vec![(
+                "entries",
+                AtomPropertyValue::Table(TablePropertyValue {
+                    headers: Some(vec![
+                        "first_chunk",
+                        "samples_per_chunk",
+                        "sample_description_index",
+                    ]),
+                    rows: stsc
+                        .entries
+                        .iter()
+                        .map(|entry| {
+                            vec![
+                                BasicPropertyValue::from(entry.first_chunk),
+                                BasicPropertyValue::from(entry.samples_per_chunk),
+                                BasicPropertyValue::from(entry.sample_description_index),
+                            ]
+                        })
+                        .collect(),
+                }),
+            )],
         },
         Any::Stsz(stsz) => AtomProperties {
             box_name: "SampleSizeBox",
             properties: vec![
-                ("size", size),
                 (
                     "sample_count",
                     match &stsz.samples {
@@ -1204,59 +1136,46 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         },
         Any::Stss(stss) => AtomProperties {
             box_name: "SyncSampleBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "entries",
-                    AtomPropertyValue::from(array_string_from(&stss.entries)),
-                ),
-            ],
+            properties: vec![(
+                "entries",
+                AtomPropertyValue::from(array_string_from(&stss.entries)),
+            )],
         },
         Any::Stco(stco) => AtomProperties {
             box_name: "ChunkOffsetBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "entries",
-                    AtomPropertyValue::from(array_string_from(&stco.entries)),
-                ),
-            ],
+            properties: vec![(
+                "entries",
+                AtomPropertyValue::from(array_string_from(&stco.entries)),
+            )],
         },
         Any::Co64(co64) => AtomProperties {
             box_name: "ChunkLargeOffsetBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "entries",
-                    AtomPropertyValue::from(array_string_from(&co64.entries)),
-                ),
-            ],
+            properties: vec![(
+                "entries",
+                AtomPropertyValue::from(array_string_from(&co64.entries)),
+            )],
         },
         Any::Ctts(ctts) => AtomProperties {
             box_name: "CompositionOffsetBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "entries",
-                    AtomPropertyValue::from(
-                        ctts.entries
-                            .iter()
-                            .map(|entry| {
-                                format!(
-                                    "(count: {}, offset: {})",
-                                    entry.sample_count, entry.sample_offset
-                                )
-                            })
-                            .collect::<Vec<String>>()
-                            .join(", "),
-                    ),
+            properties: vec![(
+                "entries",
+                AtomPropertyValue::from(
+                    ctts.entries
+                        .iter()
+                        .map(|entry| {
+                            format!(
+                                "(count: {}, offset: {})",
+                                entry.sample_count, entry.sample_offset
+                            )
+                        })
+                        .collect::<Vec<String>>()
+                        .join(", "),
                 ),
-            ],
+            )],
         },
         Any::Saio(saio) => AtomProperties {
             box_name: "SampleAuxiliaryInformationOffsetsBox",
             properties: vec![
-                ("size", size),
                 (
                     "aux_info_type",
                     AtomPropertyValue::from(saio.aux_info.as_ref().map(|a| a.aux_info_type)),
@@ -1276,7 +1195,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Saiz(saiz) => AtomProperties {
             box_name: "SampleAuxiliaryInformationSizesBox",
             properties: vec![
-                ("size", size),
                 (
                     "aux_info_type",
                     AtomPropertyValue::from(saiz.aux_info.as_ref().map(|a| a.aux_info_type)),
@@ -1300,35 +1218,28 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         },
         Any::Dref(dref) => AtomProperties {
             box_name: "DataReferenceBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "urls",
-                    AtomPropertyValue::Table(TablePropertyValue {
-                        headers: None,
-                        rows: dref
-                            .urls
-                            .iter()
-                            .map(|url| vec![BasicPropertyValue::from(&url.location)])
-                            .collect(),
-                    }),
-                ),
-            ],
+            properties: vec![(
+                "urls",
+                AtomPropertyValue::Table(TablePropertyValue {
+                    headers: None,
+                    rows: dref
+                        .urls
+                        .iter()
+                        .map(|url| vec![BasicPropertyValue::from(&url.location)])
+                        .collect(),
+                }),
+            )],
         },
         Any::Smhd(smhd) => AtomProperties {
             box_name: "SoundMediaHeaderBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "balance",
-                    AtomPropertyValue::from(format!("{:?}", smhd.balance)),
-                ),
-            ],
+            properties: vec![(
+                "balance",
+                AtomPropertyValue::from(format!("{:?}", smhd.balance)),
+            )],
         },
         Any::Vmhd(vmhd) => AtomProperties {
             box_name: "VideoMediaHeaderBox",
             properties: vec![
-                ("size", size),
                 ("graphics_mode", AtomPropertyValue::from(vmhd.graphics_mode)),
                 (
                     "op_color",
@@ -1341,47 +1252,40 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         },
         Any::Elst(elst) => AtomProperties {
             box_name: "EditListBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "entries",
-                    AtomPropertyValue::Table(TablePropertyValue {
-                        headers: Some(vec![
-                            "segment_duration",
-                            "media_time",
-                            "media_rate",
-                            "media_rate_fraction",
-                        ]),
-                        rows: elst
-                            .entries
-                            .iter()
-                            .map(|entry| {
-                                vec![
-                                    BasicPropertyValue::from(entry.segment_duration),
-                                    BasicPropertyValue::from(entry.media_time),
-                                    BasicPropertyValue::from(entry.media_rate),
-                                    BasicPropertyValue::from(entry.media_rate_fraction),
-                                ]
-                            })
-                            .collect(),
-                    }),
-                ),
-            ],
+            properties: vec![(
+                "entries",
+                AtomPropertyValue::Table(TablePropertyValue {
+                    headers: Some(vec![
+                        "segment_duration",
+                        "media_time",
+                        "media_rate",
+                        "media_rate_fraction",
+                    ]),
+                    rows: elst
+                        .entries
+                        .iter()
+                        .map(|entry| {
+                            vec![
+                                BasicPropertyValue::from(entry.segment_duration),
+                                BasicPropertyValue::from(entry.media_time),
+                                BasicPropertyValue::from(entry.media_rate),
+                                BasicPropertyValue::from(entry.media_rate_fraction),
+                            ]
+                        })
+                        .collect(),
+                }),
+            )],
         },
         Any::Mehd(mehd) => AtomProperties {
             box_name: "MovieExtendsHeaderBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "fragment_duration",
-                    AtomPropertyValue::from(mehd.fragment_duration),
-                ),
-            ],
+            properties: vec![(
+                "fragment_duration",
+                AtomPropertyValue::from(mehd.fragment_duration),
+            )],
         },
         Any::Trex(trex) => AtomProperties {
             box_name: "TrackExtendsBox",
             properties: vec![
-                ("size", size),
                 ("track_id", AtomPropertyValue::from(trex.track_id)),
                 (
                     "default_sample_description_index",
@@ -1404,7 +1308,6 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         Any::Emsg(emsg) => AtomProperties {
             box_name: "EventMessageBox",
             properties: vec![
-                ("size", size),
                 ("timescale", AtomPropertyValue::from(emsg.timescale)),
                 match emsg.presentation_time {
                     mp4_atom::EmsgTimestamp::Relative(t) => {
@@ -1434,18 +1337,14 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         },
         Any::Mfhd(mfhd) => AtomProperties {
             box_name: "MovieFragmentHeaderBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "sequence_number",
-                    AtomPropertyValue::from(mfhd.sequence_number),
-                ),
-            ],
+            properties: vec![(
+                "sequence_number",
+                AtomPropertyValue::from(mfhd.sequence_number),
+            )],
         },
         Any::Tfhd(tfhd) => AtomProperties {
             box_name: "TrackFragmentHeaderBox",
             properties: vec![
-                ("size", size),
                 ("track_id", AtomPropertyValue::from(tfhd.track_id)),
                 (
                     "base_data_offset",
@@ -1471,18 +1370,14 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         },
         Any::Tfdt(tfdt) => AtomProperties {
             box_name: "TrackFragmentBaseMediaDecodeTimeBox",
-            properties: vec![
-                ("size", size),
-                (
-                    "base_media_decode_time",
-                    AtomPropertyValue::from(tfdt.base_media_decode_time),
-                ),
-            ],
+            properties: vec![(
+                "base_media_decode_time",
+                AtomPropertyValue::from(tfdt.base_media_decode_time),
+            )],
         },
         Any::Trun(trun) => AtomProperties {
             box_name: "TrackRunBox",
             properties: vec![
-                ("size", size),
                 ("data_offset", AtomPropertyValue::from(trun.data_offset)),
                 (
                     "entries",
@@ -1506,15 +1401,15 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
         },
         Any::Skip(_) => AtomProperties {
             box_name: "FreeSpaceBox",
-            properties: vec![("size", size)],
+            properties: vec![],
         },
         Any::Free(_) => AtomProperties {
             box_name: "FreeSpaceBox",
-            properties: vec![("size", size)],
+            properties: vec![],
         },
         Any::Unknown(_, items) => AtomProperties {
             box_name: "Unknown (unhandled box parsing)",
-            properties: vec![("size", size), ("data", AtomPropertyValue::from(items))],
+            properties: vec![("data", AtomPropertyValue::from(items))],
         },
         Any::Meta(_) => unimplemented!(), // MetaBox
         Any::Iprp(_) => unimplemented!(), // ItemPropertiesBox
@@ -1555,7 +1450,15 @@ pub fn get_properties(
     header: &Header,
     reader: &mut Cursor<Vec<u8>>,
 ) -> mp4_atom::Result<AtomPropertiesWithDepth> {
-    match header.kind {
+    let size = AtomPropertyValue::Basic(
+        header
+            .size
+            .map(|size| BasicPropertyValue::Usize(size + 8)) // (FourCC=4 + size=4 == 8)
+            .unwrap_or(BasicPropertyValue::String(String::from(
+                "Extends to end of file",
+            ))),
+    );
+    let mut properties = match header.kind {
         // Container boxes
         mp4_atom::Meta::KIND => container(header, "MetaBox", reader),
         mp4_atom::Iprp::KIND => container(header, "ItemPropertiesBox", reader),
@@ -1583,16 +1486,12 @@ pub fn get_properties(
         mp4_atom::Mp4a::KIND => audio_entry(header, "MP4AudioSampleEntryBox", reader),
         mp4_atom::Opus::KIND => audio_entry(header, "OpusSampleEntryBox", reader),
         mp4_atom::Mdat::KIND => {
-            let size =
-                AtomPropertyValue::Basic(header.size.map(BasicPropertyValue::Usize).unwrap_or(
-                    BasicPropertyValue::String(String::from("Extends to end of file")),
-                ));
             let remaining_box_size = header.size.unwrap_or_else(|| reader.remaining());
             reader.set_position(reader.position() + (remaining_box_size as u64));
             Ok(AtomPropertiesWithDepth {
                 properties: AtomProperties {
                     box_name: "MediaDataBox",
-                    properties: vec![("size", size)],
+                    properties: vec![],
                 },
                 new_depth_until: None,
             })
@@ -1600,29 +1499,67 @@ pub fn get_properties(
         // Everything else
         _ => {
             let atom = Any::decode_atom(header, reader)?;
-            let properties = get_properties_from_atom(header, &atom);
+            let properties = get_properties_from_atom(&atom);
             Ok(AtomPropertiesWithDepth {
                 properties,
                 new_depth_until: None,
             })
         }
+    }?;
+    // Wow... I'm really bad at naming things
+    properties.properties.properties.insert(0, ("size", size));
+    Ok(properties)
+}
+
+fn decode_container_version_and_flags(
+    header: &Header,
+    reader: &mut Cursor<Vec<u8>>,
+) -> mp4_atom::Result<Vec<(&'static str, AtomPropertyValue)>> {
+    match header.kind {
+        // Known full boxes that are also containers
+        mp4_atom::Meta::KIND | mp4_atom::Stsd::KIND => {
+            let version = u8::decode(reader)?;
+            let flags = [
+                u8::decode(reader)?,
+                u8::decode(reader)?,
+                u8::decode(reader)?,
+            ];
+            if header.kind == mp4_atom::Stsd::KIND {
+                // The number of entries in the `stsd` is read from the container box
+                // > unsigned int(32) entry_count;
+                _ = u32::decode(reader)?;
+            }
+            Ok(vec![
+                ("version", AtomPropertyValue::from(version)),
+                (
+                    "flags",
+                    AtomPropertyValue::from(
+                        flags
+                            .iter()
+                            .map(|byte| format!("{byte:08b}"))
+                            .collect::<Vec<String>>()
+                            .join(" "),
+                    ),
+                ),
+            ])
+        }
+        // Everything else
+        _ => Ok(vec![]),
     }
 }
 
 fn container(
     header: &Header,
     name: &'static str,
-    reader: &Cursor<Vec<u8>>,
+    reader: &mut Cursor<Vec<u8>>,
 ) -> mp4_atom::Result<AtomPropertiesWithDepth> {
-    let size = AtomPropertyValue::Basic(header.size.map(BasicPropertyValue::Usize).unwrap_or(
-        BasicPropertyValue::String(String::from("Extends to end of file")),
-    ));
     let header_size = header.size.unwrap_or_else(|| reader.remaining());
     let new_depth_until = reader.position() + (header_size as u64);
+    let version_and_flags = decode_container_version_and_flags(header, reader)?;
     Ok(AtomPropertiesWithDepth {
         properties: AtomProperties {
             box_name: name,
-            properties: vec![("size", size)],
+            properties: version_and_flags,
         },
         new_depth_until: Some(new_depth_until),
     })
@@ -1633,9 +1570,6 @@ fn visual_entry(
     name: &'static str,
     reader: &mut Cursor<Vec<u8>>,
 ) -> mp4_atom::Result<AtomPropertiesWithDepth> {
-    let size = AtomPropertyValue::Basic(header.size.map(BasicPropertyValue::Usize).unwrap_or(
-        BasicPropertyValue::String(String::from("Extends to end of file")),
-    ));
     let header_size = header.size.unwrap_or_else(|| reader.remaining());
     let new_depth_until = reader.position() + (header_size as u64);
 
@@ -1644,7 +1578,6 @@ fn visual_entry(
         properties: AtomProperties {
             box_name: name,
             properties: vec![
-                ("size", size),
                 (
                     "data_reference_index",
                     AtomPropertyValue::from(visual.data_reference_index),
@@ -1676,9 +1609,6 @@ fn audio_entry(
     name: &'static str,
     reader: &mut Cursor<Vec<u8>>,
 ) -> mp4_atom::Result<AtomPropertiesWithDepth> {
-    let size = AtomPropertyValue::Basic(header.size.map(BasicPropertyValue::Usize).unwrap_or(
-        BasicPropertyValue::String(String::from("Extends to end of file")),
-    ));
     let header_size = header.size.unwrap_or_else(|| reader.remaining());
     let new_depth_until = reader.position() + (header_size as u64);
 
@@ -1687,7 +1617,6 @@ fn audio_entry(
         properties: AtomProperties {
             box_name: name,
             properties: vec![
-                ("size", size),
                 (
                     "data_reference_index",
                     AtomPropertyValue::from(audio.data_reference_index),

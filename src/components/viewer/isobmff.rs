@@ -2,7 +2,10 @@ use crate::{
     components::viewer::SUPPLEMENTAL_VIEW_CLASS,
     utils::mp4::{get_properties, AtomProperties, AtomPropertyValue, TablePropertyValue},
 };
-use leptos::{either::Either, prelude::*};
+use leptos::{
+    either::{Either, EitherOf3},
+    prelude::*,
+};
 use mp4_atom::{Buf, FourCC, Header, ReadFrom};
 use std::io::Cursor;
 use web_sys::MouseEvent;
@@ -146,8 +149,10 @@ fn AtomInfo(properties: AtomProperties) -> impl IntoView {
 
 #[component]
 fn InnerTable(properties: TablePropertyValue) -> impl IntoView {
-    if let Some(headers) = properties.headers {
-        Either::Left(view! {
+    if properties.rows.is_empty() || properties.rows.first().is_some_and(|row| row.is_empty()) {
+        EitherOf3::A(String::new())
+    } else if let Some(headers) = properties.headers {
+        EitherOf3::B(view! {
             <table class=INNER_TABLE_CLASS>
                 <tr>{headers.iter().map(|header| view! { <th>{*header}</th> }).collect_view()}</tr>
                 {properties
@@ -167,7 +172,7 @@ fn InnerTable(properties: TablePropertyValue) -> impl IntoView {
             </table>
         })
     } else {
-        Either::Right(view! {
+        EitherOf3::C(view! {
             <table>
                 {properties
                     .rows
