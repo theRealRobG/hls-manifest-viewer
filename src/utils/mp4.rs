@@ -1,8 +1,5 @@
-use mp4_atom::{Any, FourCC, Header};
-use std::{
-    fmt::Display,
-    io::{Read, Seek},
-};
+use mp4_atom::{Any, Atom, Audio, Buf, Decode, DecodeAtom, FourCC, Header, Visual};
+use std::{fmt::Display, io::Cursor};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AtomProperties {
@@ -860,6 +857,49 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
                 ),
             ],
         },
+        Any::Esds(esds) => AtomProperties {
+            box_name: "ElementaryStreamDescriptorBox",
+            properties: vec![
+                ("size", size),
+                ("es_id", AtomPropertyValue::from(esds.es_desc.es_id)),
+                (
+                    "decoder_config_object_type_indication",
+                    AtomPropertyValue::from(esds.es_desc.dec_config.object_type_indication),
+                ),
+                (
+                    "decoder_config_stream_type",
+                    AtomPropertyValue::from(esds.es_desc.dec_config.stream_type),
+                ),
+                (
+                    "decoder_config_up_stream",
+                    AtomPropertyValue::from(esds.es_desc.dec_config.up_stream),
+                ),
+                (
+                    "decoder_config_buffer_size_db",
+                    AtomPropertyValue::from(u32::from(esds.es_desc.dec_config.buffer_size_db)),
+                ),
+                (
+                    "decoder_config_max_bitrate",
+                    AtomPropertyValue::from(esds.es_desc.dec_config.max_bitrate),
+                ),
+                (
+                    "decoder_config_avg_bitrate",
+                    AtomPropertyValue::from(esds.es_desc.dec_config.avg_bitrate),
+                ),
+                (
+                    "decoder_specific_profile",
+                    AtomPropertyValue::from(esds.es_desc.dec_config.dec_specific.profile),
+                ),
+                (
+                    "decoder_specific_freq_index",
+                    AtomPropertyValue::from(esds.es_desc.dec_config.dec_specific.freq_index),
+                ),
+                (
+                    "decoder_specific_chan_conf",
+                    AtomPropertyValue::from(esds.es_desc.dec_config.dec_specific.chan_conf),
+                ),
+            ],
+        },
         Any::Tx3g(tx3g) => AtomProperties {
             box_name: "3GPP Timed Text",
             properties: vec![
@@ -1464,54 +1504,207 @@ pub fn get_properties_from_atom(header: &Header, atom: &Any) -> AtomProperties {
                 ),
             ],
         },
-        Any::Meta(meta) => unimplemented!(), // MetaBox
-        Any::Iprp(iprp) => unimplemented!(), // ItemPropertiesBox
-        Any::Ipco(ipco) => unimplemented!(), // ItemPropertyContainerBox
-        Any::Ilst(ilst) => unimplemented!(), // MetadataItemList
-        Any::Moov(moov) => unimplemented!(), // MovieBox
-        Any::Udta(udta) => unimplemented!(), // UserDataBox
-        Any::Skip(skip) => unimplemented!(), // FreeSpaceBox
-        Any::Trak(trak) => unimplemented!(), // TrackBox
-        Any::Mdia(mdia) => unimplemented!(), // MediaBox
-        Any::Minf(minf) => unimplemented!(), // MediaInformationBox
-        Any::Stbl(stbl) => unimplemented!(), // SampleTableBox
-        Any::Stsd(stsd) => unimplemented!(), // SampleDescriptionBox
-        Any::Avc1(avc1) => unimplemented!(), // AVCSampleEntryBox
-        Any::Hev1(hev1) => unimplemented!(), // HEVCSampleEntryBox
-        Any::Hvc1(hvc1) => unimplemented!(), // HEVCSampleEntryBox
-        Any::Mp4a(mp4a) => unimplemented!(), // MP4AudioSampleEntryBox
-        Any::Esds(esds) => unimplemented!(), // ElementaryStreamDescriptorBox
-        Any::Vp08(vp08) => unimplemented!(), // VP08SampleEntryBox
-        Any::Vp09(vp09) => unimplemented!(), // VP09SampleEntryBox
-        Any::Av01(av01) => unimplemented!(), // AV1SampleEntryBox
-        Any::Opus(opus) => unimplemented!(), // OpusSampleEntryBox
-        Any::Uncv(uncv) => unimplemented!(), // UncompressedFrameSampleEntryBox
-        Any::Dinf(dinf) => unimplemented!(), // DataInformationBox
-        Any::Edts(edts) => unimplemented!(), // EditBox
-        Any::Mvex(mvex) => unimplemented!(), // MovieExtendsBox
-        Any::Moof(moof) => unimplemented!(), // MovieFragmentBox
-        Any::Traf(traf) => unimplemented!(), // TrackFragmentBox
-        Any::Mdat(mdat) => unimplemented!(), // MediaDataBox
-        Any::Free(free) => unimplemented!(), // FreeSpaceBox
-        Any::Unknown(four_cc, items) => unimplemented!(),
+        Any::Skip(_) => AtomProperties {
+            box_name: "FreeSpaceBox",
+            properties: vec![("size", size)],
+        },
+        Any::Free(_) => AtomProperties {
+            box_name: "FreeSpaceBox",
+            properties: vec![("size", size)],
+        },
+        Any::Unknown(_, items) => AtomProperties {
+            box_name: "Unknown (unhandled box parsing)",
+            properties: vec![("size", size), ("data", AtomPropertyValue::from(items))],
+        },
+        Any::Meta(_) => unimplemented!(), // MetaBox
+        Any::Iprp(_) => unimplemented!(), // ItemPropertiesBox
+        Any::Ipco(_) => unimplemented!(), // ItemPropertyContainerBox
+        Any::Ilst(_) => unimplemented!(), // MetadataItemList
+        Any::Moov(_) => unimplemented!(), // MovieBox
+        Any::Udta(_) => unimplemented!(), // UserDataBox
+        Any::Trak(_) => unimplemented!(), // TrackBox
+        Any::Mdia(_) => unimplemented!(), // MediaBox
+        Any::Minf(_) => unimplemented!(), // MediaInformationBox
+        Any::Stbl(_) => unimplemented!(), // SampleTableBox
+        Any::Stsd(_) => unimplemented!(), // SampleDescriptionBox
+        Any::Avc1(_) => unimplemented!(), // AVCSampleEntryBox
+        Any::Hev1(_) => unimplemented!(), // HEVCSampleEntryBox
+        Any::Hvc1(_) => unimplemented!(), // HEVCSampleEntryBox
+        Any::Mp4a(_) => unimplemented!(), // MP4AudioSampleEntryBox
+        Any::Vp08(_) => unimplemented!(), // VP08SampleEntryBox
+        Any::Vp09(_) => unimplemented!(), // VP09SampleEntryBox
+        Any::Av01(_) => unimplemented!(), // AV1SampleEntryBox
+        Any::Opus(_) => unimplemented!(), // OpusSampleEntryBox
+        Any::Uncv(_) => unimplemented!(), // UncompressedFrameSampleEntryBox
+        Any::Dinf(_) => unimplemented!(), // DataInformationBox
+        Any::Edts(_) => unimplemented!(), // EditBox
+        Any::Mvex(_) => unimplemented!(), // MovieExtendsBox
+        Any::Moof(_) => unimplemented!(), // MovieFragmentBox
+        Any::Traf(_) => unimplemented!(), // TrackFragmentBox
+        Any::Mdat(_) => unimplemented!(), // MediaDataBox
         _ => todo!(),
     }
 }
 
 pub struct AtomPropertiesWithDepth {
     pub properties: AtomProperties,
-    pub new_depth_until: Option<usize>,
+    pub new_depth_until: Option<u64>,
 }
 
-pub fn get_properties<R: Read + Seek>(
+pub fn get_properties(
     header: &Header,
-    reader: &mut R,
+    reader: &mut Cursor<Vec<u8>>,
 ) -> mp4_atom::Result<AtomPropertiesWithDepth> {
-    todo!()
+    match header.kind {
+        // Container boxes
+        mp4_atom::Meta::KIND => container(header, "MetaBox", reader),
+        mp4_atom::Iprp::KIND => container(header, "ItemPropertiesBox", reader),
+        mp4_atom::Ipco::KIND => container(header, "ItemPropertyContainerBox", reader),
+        mp4_atom::Ilst::KIND => container(header, "MetadataItemList", reader),
+        mp4_atom::Moov::KIND => container(header, "MovieBox", reader),
+        mp4_atom::Udta::KIND => container(header, "UserDataBox", reader),
+        mp4_atom::Trak::KIND => container(header, "TrackBox", reader),
+        mp4_atom::Mdia::KIND => container(header, "MediaBox", reader),
+        mp4_atom::Minf::KIND => container(header, "MediaInformationBox", reader),
+        mp4_atom::Stbl::KIND => container(header, "SampleTableBox", reader),
+        mp4_atom::Stsd::KIND => container(header, "SampleDescriptionBox", reader),
+        mp4_atom::Dinf::KIND => container(header, "DataInformationBox", reader),
+        mp4_atom::Edts::KIND => container(header, "EditBox", reader),
+        mp4_atom::Mvex::KIND => container(header, "MovieExtendsBox", reader),
+        mp4_atom::Moof::KIND => container(header, "MovieFragmentBox", reader),
+        mp4_atom::Traf::KIND => container(header, "TrackFragmentBox", reader),
+        mp4_atom::Avc1::KIND => visual_entry(header, "AVCSampleEntryBox", reader),
+        mp4_atom::Hev1::KIND => visual_entry(header, "HEVCSampleEntryBox", reader),
+        mp4_atom::Hvc1::KIND => visual_entry(header, "HEVCSampleEntryBox", reader),
+        mp4_atom::Vp08::KIND => visual_entry(header, "VP08SampleEntryBox", reader),
+        mp4_atom::Vp09::KIND => visual_entry(header, "VP09SampleEntryBox", reader),
+        mp4_atom::Av01::KIND => visual_entry(header, "AV1SampleEntryBox", reader),
+        mp4_atom::Uncv::KIND => visual_entry(header, "UncompressedFrameSampleEntryBox", reader),
+        mp4_atom::Mp4a::KIND => audio_entry(header, "MP4AudioSampleEntryBox", reader),
+        mp4_atom::Opus::KIND => audio_entry(header, "OpusSampleEntryBox", reader),
+        mp4_atom::Mdat::KIND => {
+            let size =
+                AtomPropertyValue::Basic(header.size.map(BasicPropertyValue::Usize).unwrap_or(
+                    BasicPropertyValue::String(String::from("Extends to end of file")),
+                ));
+            let remaining_box_size = header.size.unwrap_or_else(|| reader.remaining());
+            reader.set_position(reader.position() + (remaining_box_size as u64));
+            Ok(AtomPropertiesWithDepth {
+                properties: AtomProperties {
+                    box_name: "MediaDataBox",
+                    properties: vec![("size", size)],
+                },
+                new_depth_until: None,
+            })
+        }
+        // Everything else
+        _ => {
+            let atom = Any::decode_atom(header, reader)?;
+            let properties = get_properties_from_atom(header, &atom);
+            Ok(AtomPropertiesWithDepth {
+                properties,
+                new_depth_until: None,
+            })
+        }
+    }
 }
 
-pub fn is_known_container(four_cc: FourCC) -> bool {
-    todo!()
+fn container(
+    header: &Header,
+    name: &'static str,
+    reader: &Cursor<Vec<u8>>,
+) -> mp4_atom::Result<AtomPropertiesWithDepth> {
+    let size = AtomPropertyValue::Basic(header.size.map(BasicPropertyValue::Usize).unwrap_or(
+        BasicPropertyValue::String(String::from("Extends to end of file")),
+    ));
+    let header_size = header.size.unwrap_or_else(|| reader.remaining());
+    let new_depth_until = reader.position() + (header_size as u64);
+    Ok(AtomPropertiesWithDepth {
+        properties: AtomProperties {
+            box_name: name,
+            properties: vec![("size", size)],
+        },
+        new_depth_until: Some(new_depth_until),
+    })
+}
+
+fn visual_entry(
+    header: &Header,
+    name: &'static str,
+    reader: &mut Cursor<Vec<u8>>,
+) -> mp4_atom::Result<AtomPropertiesWithDepth> {
+    let size = AtomPropertyValue::Basic(header.size.map(BasicPropertyValue::Usize).unwrap_or(
+        BasicPropertyValue::String(String::from("Extends to end of file")),
+    ));
+    let header_size = header.size.unwrap_or_else(|| reader.remaining());
+    let new_depth_until = reader.position() + (header_size as u64);
+
+    let visual = Visual::decode(reader)?;
+    Ok(AtomPropertiesWithDepth {
+        properties: AtomProperties {
+            box_name: name,
+            properties: vec![
+                ("size", size),
+                (
+                    "data_reference_index",
+                    AtomPropertyValue::from(visual.data_reference_index),
+                ),
+                ("width", AtomPropertyValue::from(visual.width)),
+                ("height", AtomPropertyValue::from(visual.height)),
+                (
+                    "horizresolution",
+                    AtomPropertyValue::from(format!("{:?}", visual.horizresolution)),
+                ),
+                (
+                    "vertresolution",
+                    AtomPropertyValue::from(format!("{:?}", visual.vertresolution)),
+                ),
+                ("frame_count", AtomPropertyValue::from(visual.frame_count)),
+                (
+                    "compressor",
+                    AtomPropertyValue::from(String::from(visual.compressor)),
+                ),
+                ("depth", AtomPropertyValue::from(visual.depth)),
+            ],
+        },
+        new_depth_until: Some(new_depth_until),
+    })
+}
+
+fn audio_entry(
+    header: &Header,
+    name: &'static str,
+    reader: &mut Cursor<Vec<u8>>,
+) -> mp4_atom::Result<AtomPropertiesWithDepth> {
+    let size = AtomPropertyValue::Basic(header.size.map(BasicPropertyValue::Usize).unwrap_or(
+        BasicPropertyValue::String(String::from("Extends to end of file")),
+    ));
+    let header_size = header.size.unwrap_or_else(|| reader.remaining());
+    let new_depth_until = reader.position() + (header_size as u64);
+
+    let audio = Audio::decode(reader)?;
+    Ok(AtomPropertiesWithDepth {
+        properties: AtomProperties {
+            box_name: name,
+            properties: vec![
+                ("size", size),
+                (
+                    "data_reference_index",
+                    AtomPropertyValue::from(audio.data_reference_index),
+                ),
+                (
+                    "channel_count",
+                    AtomPropertyValue::from(audio.channel_count),
+                ),
+                ("sample_size", AtomPropertyValue::from(audio.sample_size)),
+                (
+                    "sample_rate",
+                    AtomPropertyValue::from(format!("{:?}", audio.sample_rate)),
+                ),
+            ],
+        },
+        new_depth_until: Some(new_depth_until),
+    })
 }
 
 fn byte_array_from(bytes: &[u8]) -> BasicPropertyValue {
@@ -1524,10 +1717,6 @@ fn byte_array_string_from(bytes: &[u8]) -> String {
         .map(|byte| format!("{byte:#04x}"))
         .collect::<Vec<String>>()
         .join(" ")
-}
-
-fn flag_array_from(bytes: &[u8]) -> BasicPropertyValue {
-    BasicPropertyValue::from(array_string_from(bytes))
 }
 
 fn array_string_from<T: Display>(items: &[T]) -> String {

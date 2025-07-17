@@ -192,8 +192,44 @@
       border-style: solid;
       border-width: 1px;
       border-color: var(--color-stone-600);
-      padding: 2px;
+      padding: calc(var(--spacing) * 2);
       margin-left: auto;
+      display: flex;
+      min-width: 30%;
+    }
+
+    .viewer-supplemental .mp4-atoms {
+      margin-right: calc(var(--spacing) * 5);
+    }
+
+    .viewer-supplemental .mp4-atoms pre {
+      cursor: pointer;
+    }
+
+    .viewer-supplemental .mp4-properties p {
+      margin-inline: auto;
+      text-align: center;
+      padding: calc(var(--spacing) * 2);
+    }
+
+    .viewer-supplemental .mp4-properties table {
+      border-collapse: collapse;
+    }
+
+    .viewer-supplemental .mp4-properties th,
+    .viewer-supplemental .mp4-properties td {
+      padding-inline: var(--spacing);
+      text-align: start;
+      border-style: solid;
+      border-collapse: collapse;
+      border-width: 1px;
+      border-color: var(--color-stone-600);
+      vertical-align: top;
+    }
+
+    .viewer-supplemental .mp4-properties .mp4-inner-table th,
+    .viewer-supplemental .mp4-properties .mp4-inner-table td {
+      border: none;
     }
 
     .viewer-content p,

@@ -9,6 +9,7 @@ use web_sys::MouseEvent;
 
 const ATOMS_CLASS: &str = "mp4-atoms";
 const PROPERTIES_CLASS: &str = "mp4-properties";
+const INNER_TABLE_CLASS: &str = "mp4-inner-table";
 
 #[component]
 pub fn IsobmffViewer(data: Vec<u8>) -> mp4_atom::Result<impl IntoView> {
@@ -43,16 +44,12 @@ pub fn IsobmffViewer(data: Vec<u8>) -> mp4_atom::Result<impl IntoView> {
         // In the example above, you can see that both the `traf` and the `moof` finish at the same
         // data position (at the end of the `senc`), and so we would pop off two depths in that
         // case.
-        let mut depths_to_pop = 0;
         while let Some(depth_until) = depths.last() {
-            if reader.position() >= (*depth_until as u64) {
-                depths_to_pop += 1;
+            if reader.position() >= (*depth_until) {
+                depths.pop();
             } else {
                 break;
             }
-        }
-        for _ in 0..depths_to_pop {
-            depths.pop();
         }
         // The depth is then the size of the depths vector. We take the depth now (before the new
         // info) because a new container box should still appear at the same depth as its sibling
@@ -67,20 +64,18 @@ pub fn IsobmffViewer(data: Vec<u8>) -> mp4_atom::Result<impl IntoView> {
             depths.push(new_depth_until);
         }
 
-        let is_highlighted = move || highlighted.get() == index;
-
         let atoms_view = view! {
             <AtomName
                 atom=header.kind
                 depth
-                highlighted=is_highlighted()
+                highlighted=move || highlighted.get() == index
                 on_click=move |_| set_highlighted.set(index)
             />
         };
         atoms.push(atoms_view);
 
         let properties_view = view! {
-            <Show when=is_highlighted>
+            <Show when=move || highlighted.get() == index>
                 <AtomInfo properties=info.properties.clone() />
             </Show>
         };
@@ -103,7 +98,7 @@ pub fn IsobmffViewer(data: Vec<u8>) -> mp4_atom::Result<impl IntoView> {
 fn AtomName(
     atom: FourCC,
     depth: usize,
-    highlighted: bool,
+    highlighted: impl Fn() -> bool + Send + Sync + 'static,
     on_click: impl FnMut(MouseEvent) + 'static,
 ) -> impl IntoView {
     let mut space = String::new();
@@ -153,7 +148,7 @@ fn AtomInfo(properties: AtomProperties) -> impl IntoView {
 fn InnerTable(properties: TablePropertyValue) -> impl IntoView {
     if let Some(headers) = properties.headers {
         Either::Left(view! {
-            <table>
+            <table class=INNER_TABLE_CLASS>
                 <tr>{headers.iter().map(|header| view! { <th>{*header}</th> }).collect_view()}</tr>
                 {properties
                     .rows
