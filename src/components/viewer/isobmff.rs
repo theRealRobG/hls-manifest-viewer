@@ -18,7 +18,7 @@ pub fn IsobmffViewer(data: Vec<u8>) -> mp4_atom::Result<impl IntoView> {
     let mut atoms = Vec::new();
     let mut properties = Vec::new();
     let mut index = 0usize;
-    let mut depths = Vec::new();
+    let mut container_box_end_positions = Vec::new();
     loop {
         let header = Header::read_from(&mut reader)?;
         // Handle popping out of depths when we have reached the end of container boxes. Multiple
@@ -44,9 +44,9 @@ pub fn IsobmffViewer(data: Vec<u8>) -> mp4_atom::Result<impl IntoView> {
         // In the example above, you can see that both the `traf` and the `moof` finish at the same
         // data position (at the end of the `senc`), and so we would pop off two depths in that
         // case.
-        while let Some(depth_until) = depths.last() {
+        while let Some(depth_until) = container_box_end_positions.last() {
             if reader.position() >= (*depth_until) {
-                depths.pop();
+                container_box_end_positions.pop();
             } else {
                 break;
             }
@@ -54,14 +54,14 @@ pub fn IsobmffViewer(data: Vec<u8>) -> mp4_atom::Result<impl IntoView> {
         // The depth is then the size of the depths vector. We take the depth now (before the new
         // info) because a new container box should still appear at the same depth as its sibling
         // boxes.
-        let depth = depths.len();
+        let depth = container_box_end_positions.len();
         // We then get the property information for this box.
         let info = get_properties(&header, &mut reader)?;
         // If the new info is a container box then we will receive a new "depth until" that
         // indicates at what reader position this box will end at. Above we handle tracking how deep
         // we are into any given box and at what size the box ends.
         if let Some(new_depth_until) = info.new_depth_until {
-            depths.push(new_depth_until);
+            container_box_end_positions.push(new_depth_until);
         }
 
         let atoms_view = view! {
