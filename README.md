@@ -78,14 +78,14 @@ trunk serve --public-url "/hls-manifest-viewer"
 ```
 Annoyingly the `--public-url` flag is needed because I've hard-coded the GitHub Pages site path into
 the project source code. GitHub Pages publishes the site to a path component from the base domain
-(therealrobg.github.io/hls-manifest-viewer in this case). Trunk can fix source locations for this by
-using this flag, which would hopefully only be needed when publishing; however, the Leptos Router is
-broken by this unexpected path component. I've experimented with making this more dynamic, as you
-can read the site's [Base URI][16] (from the Document), so theoretically I could update the router
-paths for each page to be more dynamic on startup. I had a brief exploration here but the paths
-defined in the router need to have static lifetimes so it's difficult to derive a path at runtime (I
-_could_ do some nasty things like using [String::leak][17], but in the end, it was late and I just
-wanted to get the site to work). This should be improved.
+(https://therealrobg.github.io/hls-manifest-viewer in this case). Trunk can fix source locations for
+this by using this flag, which would hopefully only be needed when publishing; however, the Leptos
+Router is broken by this unexpected path component. I've experimented with making this more dynamic,
+as you can read the site's [Base URI][16] (from the Document), so theoretically I could update the
+router paths for each page to be more dynamic on startup. I had a brief exploration here but the
+paths defined in the router need to have static lifetimes so it's difficult to derive a path at
+runtime (I _could_ do some nasty things like using [String::leak][17], but in the end, it was late
+and I just wanted to get the site to work). This should be improved.
 
 [16]: https://developer.mozilla.org/en-US/docs/Web/API/Node/baseURI
 [17]: https://doc.rust-lang.org/std/string/struct.String.html#method.leak
@@ -100,3 +100,39 @@ The `--no-default-features` flag means that `console_log` dependency is not comp
 output. I initially did this to keep the size of the output wasm module smaller, but really it only
 saves like 1KB out of about 890KB, so not really needed. That being said, it's another exercise in
 using more Cargo features for educational purposes.
+
+## Acknowledgements
+* The genesis of this tool (for me) is the brilliant [Adaptive Bitrate Manifest Viewer][18] Chrome
+  extension, that sadly, is not available in the Chrome store anymore (as it does not follow best
+  practices for Chrome extensions and the developer does not have the time to update it). This
+  extension would hijack any requests to URLs with file extension `.m3u8` or `.m3u` and reload it
+  in a new page it would deliver instead that would make the manifest request, parse it, and provide
+  a colorized output with links that actually resolve properly. For me, this made my early learning
+  of HLS **much** easier, as I could easily browse manifests that I was dealing with and quickly
+  cross-reference tags against the HLS spec (which is also very convenient in the IETF site that it
+  has a "html-ized" version with quick links to the various sections). I still feel that this tool
+  is more convenient than my one, as it would automatically handle requests from search in the
+  Chrome URL input bar, so one less degree of separation and super convenient. I may later look into
+  delivering a Chrome extension too for the convenience factor (I believe Chrome extensions support
+  WebAssembly).
+* The fantastic [MP4Box.js / ISOBMFF Box Structure Viewer][19] is where most of the inspiration for
+  the "isobmff" view came from. That site does a really great job in displaying the contents of MP4
+  files, and at some stage I may add a button to link directly to that site for the fMP4 (I've found
+  that this works just by including the file URL as the query string, i.e., no key, just the value).
+  The only benefit for displaying the view in my tool is that it keeps the investigation of the
+  media in one place without having to jump around too many tools (and also, it was educational for
+  me to go through all of the ISOBMFF defined boxes, and further boxes e.g. CENC, AVC1, etc.).
+* Professionally, working with the [Comcast/mamba][20] (especially when writing many different types
+  of manifest manipulation for iOS playback) gave me my familiarity with the concepts of HLS, and
+  also demonstrated to me how zero copy parsers can be very fast (when a naiive younger me tried to
+  re-write it in Swift using plenty of String allocations and finding it orders of magnitudes slower
+  than mamba). As a result, I had a desire for some time to write a "zero-copy" HLS parser in Rust,
+  and eventually found the time to write [m3u8][2].
+* The great [PSSH box tools][21] GitHub Pages site finally gave me the idea that I could write a
+  GitHub Pages site with Rust that could provide a collection of tools to help me (and others) do
+  what I (/we) do easier.
+
+[18]: https://chromewebstore.google.com/detail/adaptive-bitrate-manifest/omjpjjekjefmdkidigpkhpjnojoadbih?hl=en
+[19]: https://dist.gpac.io/mp4box.js/test/filereader.html
+[20]: https://github.com/Comcast/mamba
+[21]: https://emarsden.github.io/pssh-box-wasm/
