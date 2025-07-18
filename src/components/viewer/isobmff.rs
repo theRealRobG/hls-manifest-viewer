@@ -1,6 +1,8 @@
 use crate::{
     components::viewer::SUPPLEMENTAL_VIEW_CLASS,
-    utils::mp4::{get_properties, AtomProperties, AtomPropertyValue, TablePropertyValue},
+    utils::mp4_atom_properties::{
+        get_properties, AtomProperties, AtomPropertyValue, TablePropertyValue,
+    },
 };
 use leptos::{
     either::{Either, EitherOf3},
