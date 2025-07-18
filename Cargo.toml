@@ -22,10 +22,15 @@ url = "2.5"
 percent-encoding = "2.3"
 leptos-use = { version = "0.16", features = ["use_clipboard"] }
 mp4-atom = "0.8.1"
+console_log = { version = "1", optional = true }
+log = "0.4"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
 pretty_assertions = "1.4"
+
+[features]
+default = ["console_log"] # for release build pass --no-default-features flag
 
 [profile.release]
 opt-level = 'z'
