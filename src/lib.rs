@@ -24,10 +24,10 @@ pub fn App() -> impl IntoView {
 
         <Router>
             <nav>
-                <a class="button" href="/">
+                <a class="button" href="/hls-manifest-viewer">
                     "Home"
                 </a>
-                <a class="button" href="/about">
+                <a class="button" href="/hls-manifest-viewer/about">
                     "About"
                 </a>
                 <a
@@ -35,13 +35,13 @@ pub fn App() -> impl IntoView {
                     href="https://github.com/theRealRobG/hls-manifest-viewer"
                     target="_blank"
                 >
-                    <img src="/github-mark-white.svg" />
+                    <img src="/hls-manifest-viewer/github-mark-white.svg" />
                 </a>
             </nav>
             <main>
                 <Routes fallback=NotFound>
-                    <Route path=path!("/") view=Home />
-                    <Route path=path!("/about") view=About />
+                    <Route path=path!("/hls-manifest-viewer") view=Home />
+                    <Route path=path!("/hls-manifest-viewer/about") view=About />
                 </Routes>
             </main>
         </Router>

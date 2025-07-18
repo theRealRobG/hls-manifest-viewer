@@ -24,7 +24,7 @@ where
                     move |_| copy(&text())
                 }
             >
-                <img src="/copy.svg" />
+                <img src="/hls-manifest-viewer/copy.svg" />
             </button>
         </Show>
     }
