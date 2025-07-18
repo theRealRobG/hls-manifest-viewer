@@ -4,7 +4,9 @@ use super::{
 };
 use crate::{
     components::CopyButton,
-    utils::query_codec::{SupplementalViewQueryContext, SUPPLEMENTAL_VIEW_QUERY_NAME},
+    utils::query_codec::{
+        RequestRange, SupplementalViewQueryContext, SUPPLEMENTAL_VIEW_QUERY_NAME,
+    },
     PLAYLIST_URL_QUERY_NAME,
 };
 use leptos::{either::EitherOf3, prelude::*};
@@ -95,6 +97,7 @@ fn try_get_lines(
             .with_parsing_for_map()
             .with_parsing_for_media()
             .with_parsing_for_media_sequence()
+            .with_parsing_for_byterange()
             .with_parsing_for_i_frame_stream_inf()
             .build(),
     );
@@ -104,6 +107,8 @@ fn try_get_lines(
     let mut media_sequence = 0;
     let mut is_media_playlist = false;
     let mut highlighted_one_map = false;
+    let mut previous_segment_byterange_end = 0u64;
+    let mut segment_byterange = None;
 
     match reader.read_line() {
         Ok(Some(HlsLine::KnownTag(known::Tag::Hls(hls::Tag::M3u(tag))))) => {
@@ -122,14 +127,15 @@ fn try_get_lines(
                         if let Some(uri) = media.uri() {
                             let uri = uri.to_string();
                             let tag_inner = media.into_inner();
-                            lines.push(view_from_uri_tag(
+                            lines.push(view_from_uri_tag(UriTagViewOptions {
                                 uri,
                                 tag_inner,
-                                &base_url,
-                                UriType::Playlist,
+                                base_url: &base_url,
+                                uri_type: UriType::Playlist,
                                 media_sequence,
-                                false,
-                            ));
+                                is_highlighted: false,
+                                byterange: None,
+                            }));
                         } else {
                             let line = media.into_inner();
                             lines.push(
@@ -140,17 +146,19 @@ fn try_get_lines(
                     hls::Tag::IFrameStreamInf(iframe_stream_inf) => {
                         let uri = iframe_stream_inf.uri().to_string();
                         let tag_inner = iframe_stream_inf.into_inner();
-                        lines.push(view_from_uri_tag(
+                        lines.push(view_from_uri_tag(UriTagViewOptions {
                             uri,
                             tag_inner,
-                            &base_url,
-                            UriType::Playlist,
+                            base_url: &base_url,
+                            uri_type: UriType::Playlist,
                             media_sequence,
-                            false,
-                        ));
+                            is_highlighted: false,
+                            byterange: None,
+                        }));
                     }
                     hls::Tag::Map(map) => {
                         let uri = map.uri().to_string();
+                        let byterange = map.byterange().map(RequestRange::from);
                         let is_highlighted = if let Some(info) = &highlighted_map_info {
                             !highlighted_one_map
                                 && info.min_media_sequence <= media_sequence
@@ -162,17 +170,29 @@ fn try_get_lines(
                             highlighted_one_map = true
                         }
                         let tag_inner = map.into_inner();
-                        lines.push(view_from_uri_tag(
+                        lines.push(view_from_uri_tag(UriTagViewOptions {
                             uri,
                             tag_inner,
-                            &base_url,
-                            UriType::Map,
+                            base_url: &base_url,
+                            uri_type: UriType::Map,
                             media_sequence,
                             is_highlighted,
-                        ));
+                            byterange,
+                        }));
                     }
                     hls::Tag::MediaSequence(tag) => {
                         media_sequence = tag.media_sequence();
+                        let line = tag.into_inner();
+                        lines.push(
+                            view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any()
+                        );
+                    }
+                    hls::Tag::Byterange(tag) => {
+                        let offset = tag.offset().unwrap_or(previous_segment_byterange_end);
+                        let length = tag.length();
+                        let byterange = RequestRange::from_length_with_offset(length, offset);
+                        segment_byterange = Some(byterange);
+                        previous_segment_byterange_end = byterange.end + 1;
                         let line = tag.into_inner();
                         lines.push(
                             view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any()
@@ -198,10 +218,18 @@ fn try_get_lines(
                 } else {
                     UriType::Playlist
                 };
+                let byterange = segment_byterange;
+                segment_byterange = None;
                 lines.push(
                     view! {
                         <a
-                            href=resolve_href(&base_url, uri, uri_type, media_sequence)
+                            href=resolve_href(ResolveOptions {
+                                base_url: &base_url,
+                                uri,
+                                uri_type,
+                                media_sequence,
+                                byterange,
+                            })
                             class=uri_class
                         >
                             {uri}
@@ -235,12 +263,22 @@ enum UriType {
     Map,
 }
 
-fn resolve_href(
-    base_url: &Option<Url>,
-    uri: &str,
+struct ResolveOptions<'a> {
+    base_url: &'a Option<Url>,
+    uri: &'a str,
     uri_type: UriType,
     media_sequence: u64,
-) -> String {
+    byterange: Option<RequestRange>,
+}
+
+fn resolve_href(opts: ResolveOptions) -> String {
+    let ResolveOptions {
+        base_url,
+        uri,
+        uri_type,
+        media_sequence,
+        byterange,
+    } = opts;
     let Some(base_url) = base_url else {
         return String::from("#");
     };
@@ -257,6 +295,7 @@ fn resolve_href(
                 Some(SupplementalViewQueryContext::encode_segment(
                     query_encoded_link_url.to_string(),
                     media_sequence,
+                    byterange,
                 )),
             ),
             UriType::Map => (
@@ -264,6 +303,7 @@ fn resolve_href(
                 Some(SupplementalViewQueryContext::encode_map(
                     query_encoded_link_url.to_string(),
                     media_sequence,
+                    byterange,
                 )),
             ),
         };
@@ -280,14 +320,26 @@ fn resolve_href(
     }
 }
 
-fn view_from_uri_tag(
+struct UriTagViewOptions<'a> {
     uri: String,
-    tag_inner: TagInner,
-    base_url: &Option<Url>,
+    tag_inner: TagInner<'a>,
+    base_url: &'a Option<Url>,
     uri_type: UriType,
     media_sequence: u64,
     is_highlighted: bool,
-) -> AnyView {
+    byterange: Option<RequestRange>,
+}
+
+fn view_from_uri_tag(opts: UriTagViewOptions) -> AnyView {
+    let UriTagViewOptions {
+        uri,
+        tag_inner,
+        base_url,
+        uri_type,
+        media_sequence,
+        is_highlighted,
+        byterange,
+    } = opts;
     let line = String::from_utf8_lossy(tag_inner.value());
     let uri_index = line.find(uri.as_str()).unwrap();
     let (first, second) = line.split_at(uri_index);
@@ -296,7 +348,16 @@ fn view_from_uri_tag(
     view! {
         <p class=TAG_CLASS>
             {first}
-            <a class=class href=resolve_href(base_url, uri.as_str(), uri_type, media_sequence)>
+            <a
+                class=class
+                href=resolve_href(ResolveOptions {
+                    base_url,
+                    uri: &uri,
+                    uri_type,
+                    media_sequence,
+                    byterange,
+                })
+            >
                 {second}
             </a>{third}
         </p>
@@ -370,38 +431,74 @@ mod tests {
     fn resolve_href_when_no_base_should_just_resolve_to_hash() {
         assert_eq!(
             "#".to_string(),
-            resolve_href(&None, "some/uri.m3u8", UriType::Playlist, 0)
+            resolve_href(ResolveOptions {
+                base_url: &None,
+                uri: "some/uri.m3u8",
+                uri_type: UriType::Playlist,
+                media_sequence: 0,
+                byterange: None
+            })
         );
         assert_eq!(
             "#".to_string(),
-            resolve_href(&None, "some/uri.m3u8", UriType::Segment, 100)
+            resolve_href(ResolveOptions {
+                base_url: &None,
+                uri: "some/uri.m3u8",
+                uri_type: UriType::Segment,
+                media_sequence: 100,
+                byterange: None
+            })
         );
         assert_eq!(
             "#".to_string(),
-            resolve_href(&None, "some/uri.m3u8", UriType::Map, 100)
+            resolve_href(ResolveOptions {
+                base_url: &None,
+                uri: "some/uri.m3u8",
+                uri_type: UriType::Map,
+                media_sequence: 100,
+                byterange: None
+            })
         );
     }
 
     fn test_media_and_segment_href(base_url: Url, uri: &str, expected: &str) {
         assert_eq!(
             format!("?playlist_url={expected}"),
-            resolve_href(&Some(base_url.clone()), uri, UriType::Playlist, 0)
+            resolve_href(ResolveOptions {
+                base_url: &Some(base_url.clone()),
+                uri,
+                uri_type: UriType::Playlist,
+                media_sequence: 0,
+                byterange: None
+            })
         );
         assert_eq!(
             format!(
                 "?playlist_url={}&supplemental_view_context={}",
                 base_url.as_str(),
-                format!("SEGMENT,100,{expected}")
+                format!("SEGMENT,100,-,{expected}")
             ),
-            resolve_href(&Some(base_url.clone()), uri, UriType::Segment, 100)
+            resolve_href(ResolveOptions {
+                base_url: &Some(base_url.clone()),
+                uri,
+                uri_type: UriType::Segment,
+                media_sequence: 100,
+                byterange: None
+            })
         );
         assert_eq!(
             format!(
                 "?playlist_url={}&supplemental_view_context={}",
                 base_url.as_str(),
-                format!("MAP,100,{expected}")
+                format!("MAP,100,-,{expected}")
             ),
-            resolve_href(&Some(base_url), uri, UriType::Map, 100)
+            resolve_href(ResolveOptions {
+                base_url: &Some(base_url),
+                uri,
+                uri_type: UriType::Map,
+                media_sequence: 100,
+                byterange: None
+            })
         );
     }
 }

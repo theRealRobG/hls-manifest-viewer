@@ -6,7 +6,7 @@ mod preformatted;
 
 use crate::utils::{
     network::{fetch_array_buffer, FetchError, FetchTextResponse},
-    query_codec::{MediaSegmentContext, SupplementalViewQueryContext},
+    query_codec::{MediaSegmentContext, RequestRange, SupplementalViewQueryContext},
     response::{determine_segment_type, SegmentType},
 };
 use error::ViewerError;
@@ -79,6 +79,7 @@ pub fn Viewer(
             let MediaSegmentContext {
                 url,
                 media_sequence,
+                byterange,
             } = media_segment_context;
             view! {
                 <Container>
@@ -90,7 +91,7 @@ pub fn Viewer(
                             highlighted_segment=media_sequence
                         />
                     </ErrorBounded>
-                    <SupplementalSegmentView segment_url=url.clone() />
+                    <SupplementalSegmentView segment_url=url.clone() byterange />
                 </Container>
             }
         }
@@ -98,6 +99,7 @@ pub fn Viewer(
             let MediaSegmentContext {
                 url,
                 media_sequence,
+                byterange,
             } = media_segment_context;
             let url_for_playlist_viewer = url.clone();
             let url_for_segment_viewer = url.clone();
@@ -114,7 +116,7 @@ pub fn Viewer(
                             }
                         />
                     </ErrorBounded>
-                    <SupplementalSegmentView segment_url=url_for_segment_viewer />
+                    <SupplementalSegmentView segment_url=url_for_segment_viewer byterange />
                 </Container>
             }
         }
@@ -144,8 +146,9 @@ fn Container(children: Children) -> impl IntoView {
 }
 
 #[component]
-fn SupplementalSegmentView(segment_url: String) -> impl IntoView {
-    let segment_result = LocalResource::new(move || fetch_array_buffer(segment_url.clone()));
+fn SupplementalSegmentView(segment_url: String, byterange: Option<RequestRange>) -> impl IntoView {
+    let segment_result =
+        LocalResource::new(move || fetch_array_buffer(segment_url.clone(), byterange));
     view! {
         <Suspense fallback=|| {
             view! { <div class=SUPPLEMENTAL_VIEW_CLASS>"Loading..."</div> }

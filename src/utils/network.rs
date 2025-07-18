@@ -2,9 +2,9 @@ use std::{error::Error, fmt::Display};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    DomException, Response,
-    js_sys::{ArrayBuffer, TypeError, Uint8Array},
+    js_sys::{ArrayBuffer, TypeError, Uint8Array}, DomException, Request, Response
 };
+use crate::utils::query_codec::RequestRange;
 
 #[derive(Debug, Clone)]
 pub struct FetchTextResponse {
@@ -47,7 +47,7 @@ pub async fn fetch_text(request_url: String) -> Result<FetchTextResponse, FetchE
     if request_url.is_empty() {
         return Ok(FetchTextResponse::empty(request_url));
     }
-    let response = response_from(&request_url).await?;
+    let response = response_from(&request_url, None).await?;
     let response_text = JsFuture::from(response.text().map_err(fetch_failed)?)
         .await
         .map_err(fetch_failed)?
@@ -61,8 +61,9 @@ pub async fn fetch_text(request_url: String) -> Result<FetchTextResponse, FetchE
 
 pub async fn fetch_array_buffer(
     request_url: String,
+    byterange: Option<RequestRange>,
 ) -> Result<FetchArrayBufferResonse, FetchError> {
-    let response = response_from(&request_url).await?;
+    let response = response_from(&request_url, byterange).await?;
     let content_type = content_type_from(&response);
     let url = response.url();
     let response_buf = JsFuture::from(response.array_buffer().map_err(fetch_failed)?)
@@ -81,9 +82,13 @@ pub async fn fetch_array_buffer(
     })
 }
 
-async fn response_from(request_url: &str) -> Result<Response, FetchError> {
+async fn response_from(request_url: &str, byterange: Option<RequestRange>) -> Result<Response, FetchError> {
     let window = web_sys::window().expect("Window must be defined");
-    let response = JsFuture::from(window.fetch_with_str(request_url))
+    let request = Request::new_with_str(request_url).map_err(fetch_failed)?;
+    if let Some(byterange) = byterange {
+        request.headers().set("Range", &byterange.range_header_value()).map_err(fetch_failed)?;
+    }
+    let response = JsFuture::from(window.fetch_with_request(&request))
         .await
         .map_err(fetch_failed)?;
     let response: Response = response
@@ -117,7 +122,7 @@ fn content_type_from(response: &Response) -> Option<String> {
 }
 
 async fn validate(response: &Response) -> Result<(), FetchError> {
-    if response.ok() {
+    if response.ok() || response.status() == 206 {
         return Ok(());
     }
     let error = format!(
