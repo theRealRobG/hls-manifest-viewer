@@ -1,0 +1,36 @@
+name: Deploy Pages
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-deploy:
+    name: 'Build and deploy pages'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run tests
+      run: cargo test --verbose
+    - name: Install trunk
+      run: cargo install trunk
+    - name: Build with trunk
+      run: trunk build --release --no-default-features --public-url "${GITHUB_REPOSITORY#*/}"
+    - name: Build Pages artifact
+      uses: actions/upload-pages-artifact@v3.0.1
+      with:
+        path: ./dist
+    - name: Deploy Pages artifact
+      uses: actions/deploy-pages@v4.0.5
