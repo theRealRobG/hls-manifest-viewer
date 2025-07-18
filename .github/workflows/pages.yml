@@ -22,19 +22,17 @@ jobs:
       id-token: write
     steps:
     - uses: actions/checkout@v4
-    - name: Log repository variable
-      run: echo "${GITHUB_REPOSITORY#*/}"
-    # - name: Add WASM target
-    #   run: rustup target add wasm32-unknown-unknown
-    # - name: Run tests
-    #   run: cargo test --verbose
-    # - name: Install trunk
-    #   run: cargo install trunk
-    # - name: Build with trunk
-    #   run: trunk build --release --no-default-features --public-url "${GITHUB_REPOSITORY#*/}"
-    # - name: Build Pages artifact
-    #   uses: actions/upload-pages-artifact@v3.0.1
-    #   with:
-    #     path: ./dist
-    # - name: Deploy Pages artifact
-    #   uses: actions/deploy-pages@v4.0.5
+    - name: Add WASM target
+      run: rustup target add wasm32-unknown-unknown
+    - name: Run tests
+      run: cargo test --verbose
+    - name: Install trunk
+      run: cargo install trunk
+    - name: Build with trunk
+      run: trunk build --release --no-default-features --public-url "${GITHUB_REPOSITORY#*/}"
+    - name: Build Pages artifact
+      uses: actions/upload-pages-artifact@v3.0.1
+      with:
+        path: ./dist
+    - name: Deploy Pages artifact
+      uses: actions/deploy-pages@v4.0.5
