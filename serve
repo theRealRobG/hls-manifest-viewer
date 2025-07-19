@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+trunk serve --public-url "/hls-manifest-viewer"
