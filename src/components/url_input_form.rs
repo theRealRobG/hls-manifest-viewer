@@ -1,7 +1,6 @@
+use crate::utils::href::PLAYLIST_URL_QUERY_NAME;
 use leptos::prelude::*;
 use leptos_router::{components::Form, hooks::use_query_map};
-
-use crate::PLAYLIST_URL_QUERY_NAME;
 
 #[component]
 pub fn UrlInputForm() -> impl IntoView {

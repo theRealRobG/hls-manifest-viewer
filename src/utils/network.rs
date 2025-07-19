@@ -1,20 +1,46 @@
 use std::{error::Error, fmt::Display};
+use m3u8::tag::hls::map::MapByterange;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     js_sys::{ArrayBuffer, TypeError, Uint8Array}, DomException, Request, Response
 };
-use crate::utils::query_codec::RequestRange;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RequestRange {
+    pub start: u64,
+    pub end: u64,
+}
+impl RequestRange {
+    pub fn from_length_with_offset(length: u64, offset: u64) -> Self {
+        Self {
+            start: offset,
+            end: (offset + length) - 1,
+        }
+    }
+
+    pub fn range_header_value(&self) -> String {
+        format!("bytes={}-{}", self.start, self.end)
+    }
+}
+impl From<MapByterange> for RequestRange {
+    fn from(value: MapByterange) -> Self {
+        Self::from_length_with_offset(value.length, value.offset)
+    }
+}
+impl Display for RequestRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-{}", self.start, self.end)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct FetchTextResponse {
-    pub request_url: String,
     pub response_text: String,
 }
 impl FetchTextResponse {
-    fn empty(request_url: String) -> Self {
+    fn empty() -> Self {
         Self {
-            request_url,
             response_text: String::new(),
         }
     }
@@ -45,7 +71,7 @@ impl Display for FetchError {
 
 pub async fn fetch_text(request_url: String) -> Result<FetchTextResponse, FetchError> {
     if request_url.is_empty() {
-        return Ok(FetchTextResponse::empty(request_url));
+        return Ok(FetchTextResponse::empty());
     }
     let response = response_from(&request_url, None).await?;
     let response_text = JsFuture::from(response.text().map_err(fetch_failed)?)
@@ -54,7 +80,6 @@ pub async fn fetch_text(request_url: String) -> Result<FetchTextResponse, FetchE
         .as_string()
         .expect("text() on a fetch Response must provide a String");
     Ok(FetchTextResponse {
-        request_url,
         response_text,
     })
 }

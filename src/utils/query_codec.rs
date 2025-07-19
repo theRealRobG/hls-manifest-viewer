@@ -1,54 +1,11 @@
-use m3u8::tag::hls::map::MapByterange;
+use crate::utils::network::RequestRange;
 use std::{error::Error, fmt::Display, num::ParseIntError};
-
-pub const SUPPLEMENTAL_VIEW_QUERY_NAME: &str = "supplemental_view_context";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MediaSegmentContext {
     pub url: String,
     pub media_sequence: u64,
     pub byterange: Option<RequestRange>,
-}
-impl MediaSegmentContext {
-    fn encode(&self) -> String {
-        format!(
-            "{},{},{}",
-            self.media_sequence,
-            if let Some(byterange) = self.byterange {
-                format!("{byterange}")
-            } else {
-                "-".to_string()
-            },
-            self.url
-        )
-    }
-}
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct RequestRange {
-    pub start: u64,
-    pub end: u64,
-}
-impl RequestRange {
-    pub fn from_length_with_offset(length: u64, offset: u64) -> Self {
-        Self {
-            start: offset,
-            end: (offset + length) - 1,
-        }
-    }
-
-    pub fn range_header_value(&self) -> String {
-        format!("bytes={}-{}", self.start, self.end)
-    }
-}
-impl From<MapByterange> for RequestRange {
-    fn from(value: MapByterange) -> Self {
-        Self::from_length_with_offset(value.length, value.offset)
-    }
-}
-impl Display for RequestRange {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}-{}", self.start, self.end)
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -57,37 +14,31 @@ pub enum SupplementalViewQueryContext {
     Map(MediaSegmentContext),
 }
 
-impl SupplementalViewQueryContext {
-    pub fn encode(&self) -> String {
-        match self {
-            Self::Segment(c) => format!("SEGMENT,{}", c.encode()),
-            Self::Map(c) => format!("MAP,{}", c.encode()),
-        }
-    }
+pub fn encode_segment(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
+    format!("SEGMENT,{}", encode(url, media_sequence, byterange))
+}
 
-    pub fn encode_segment(
-        url: String,
-        media_sequence: u64,
-        byterange: Option<RequestRange>,
-    ) -> String {
-        Self::Segment(MediaSegmentContext {
-            url,
-            media_sequence,
-            byterange,
-        })
-        .encode()
-    }
+pub fn encode_map(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
+    format!("MAP,{}", encode(url, media_sequence, byterange))
+}
 
-    pub fn encode_map(url: String, media_sequence: u64, byterange: Option<RequestRange>) -> String {
-        Self::Map(MediaSegmentContext {
-            url,
-            media_sequence,
-            byterange,
-        })
-        .encode()
-    }
+fn encode(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
+    format!(
+        "{},{},{}",
+        media_sequence,
+        if let Some(byterange) = byterange {
+            format!("{byterange}")
+        } else {
+            "-".to_string()
+        },
+        url
+    )
+}
 
-    pub fn try_decode(value: &str) -> Result<Self, SupplementalViewQueryContextDecodeError> {
+impl TryFrom<&str> for SupplementalViewQueryContext {
+    type Error = SupplementalViewQueryContextDecodeError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mut split = value.splitn(2, ',');
         let Some(type_part) = split.next() else {
             return Err(SupplementalViewQueryContextDecodeError::NoContextType);
@@ -97,23 +48,25 @@ impl SupplementalViewQueryContext {
                 let Some(value) = split.next() else {
                     return Err(SupplementalViewQueryContextDecodeError::EmptyContextValue);
                 };
-                Ok(Self::Segment(Self::try_decode_segment_context(value)?))
+                Ok(Self::Segment(MediaSegmentContext::try_from(value)?))
             }
             "MAP" => {
                 let Some(value) = split.next() else {
                     return Err(SupplementalViewQueryContextDecodeError::EmptyContextValue);
                 };
-                Ok(Self::Map(Self::try_decode_segment_context(value)?))
+                Ok(Self::Map(MediaSegmentContext::try_from(value)?))
             }
             _ => Err(SupplementalViewQueryContextDecodeError::UnknownContextType(
                 type_part.to_string(),
             )),
         }
     }
+}
 
-    fn try_decode_segment_context(
-        value: &str,
-    ) -> Result<MediaSegmentContext, SupplementalViewQueryContextDecodeError> {
+impl TryFrom<&str> for MediaSegmentContext {
+    type Error = SupplementalViewQueryContextDecodeError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mut split = value.splitn(3, ',');
         let Some(media_sequence_part) = split.next() else {
             return Err(SupplementalViewQueryContextDecodeError::MissingMediaSequencePart);
@@ -144,6 +97,16 @@ impl SupplementalViewQueryContext {
             media_sequence,
             byterange,
         })
+    }
+}
+
+#[cfg(test)]
+impl SupplementalViewQueryContext {
+    fn encode(&self) -> String {
+        match self {
+            Self::Segment(c) => encode_segment(&c.url, c.media_sequence, c.byterange),
+            Self::Map(c) => encode_map(&c.url, c.media_sequence, c.byterange),
+        }
     }
 }
 
@@ -207,7 +170,7 @@ mod tests {
         assert_eq!(string, context.encode());
         assert_eq!(
             Ok(context),
-            SupplementalViewQueryContext::try_decode(&string)
+            SupplementalViewQueryContext::try_from(string.as_str())
         )
     }
 
@@ -222,7 +185,7 @@ mod tests {
         assert_eq!(string, context.encode());
         assert_eq!(
             Ok(context),
-            SupplementalViewQueryContext::try_decode(&string)
+            SupplementalViewQueryContext::try_from(string.as_str())
         );
     }
 
@@ -237,7 +200,7 @@ mod tests {
         assert_eq!(string, context.encode());
         assert_eq!(
             Ok(context),
-            SupplementalViewQueryContext::try_decode(&string)
+            SupplementalViewQueryContext::try_from(string.as_str())
         );
     }
 
@@ -252,7 +215,7 @@ mod tests {
         assert_eq!(string, context.encode());
         assert_eq!(
             Ok(context),
-            SupplementalViewQueryContext::try_decode(&string)
+            SupplementalViewQueryContext::try_from(string.as_str())
         );
     }
 }

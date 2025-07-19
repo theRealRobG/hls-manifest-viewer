@@ -1,7 +1,9 @@
 use crate::{
-    PLAYLIST_URL_QUERY_NAME,
     components::{UrlInputForm, Viewer, ViewerLoading},
-    utils::{network::fetch_text, query_codec::SUPPLEMENTAL_VIEW_QUERY_NAME},
+    utils::{
+        href::{PLAYLIST_URL_QUERY_NAME, SUPPLEMENTAL_VIEW_QUERY_NAME},
+        network::fetch_text,
+    },
 };
 use leptos::prelude::*;
 use leptos_router::hooks::query_signal;

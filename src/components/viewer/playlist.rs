@@ -4,10 +4,10 @@ use super::{
 };
 use crate::{
     components::CopyButton,
-    utils::query_codec::{
-        RequestRange, SupplementalViewQueryContext, SUPPLEMENTAL_VIEW_QUERY_NAME,
+    utils::{
+        href::{map_href, media_playlist_href, segment_href},
+        network::RequestRange,
     },
-    PLAYLIST_URL_QUERY_NAME,
 };
 use leptos::{either::EitherOf3, prelude::*};
 use m3u8::{
@@ -19,9 +19,7 @@ use m3u8::{
     },
     Reader,
 };
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use std::{error::Error, fmt::Display};
-use url::Url;
 
 pub struct HighlightedMapInfo {
     pub url: String,
@@ -31,7 +29,6 @@ pub struct HighlightedMapInfo {
 #[component]
 pub fn PlaylistViewer(
     playlist: String,
-    base_url: String,
     #[prop(default = false)] supplemental_showing: bool,
     #[prop(optional)] highlighted_segment: Option<u64>,
     #[prop(optional)] highlighted_map_info: Option<HighlightedMapInfo>,
@@ -39,12 +36,7 @@ pub fn PlaylistViewer(
     if playlist.is_empty() {
         return Ok(EitherOf3::A(view! { <div class=MAIN_VIEW_CLASS /> }));
     }
-    match try_get_lines(
-        &playlist,
-        &base_url,
-        highlighted_segment,
-        highlighted_map_info,
-    ) {
+    match try_get_lines(&playlist, highlighted_segment, highlighted_map_info) {
         Ok(lines) => {
             if supplemental_showing {
                 Ok(EitherOf3::B(view! {
@@ -83,13 +75,9 @@ impl Error for PlaylistError {}
 
 fn try_get_lines(
     playlist: &str,
-    base_url: &str,
     highlighted_segment: Option<u64>,
     highlighted_map_info: Option<HighlightedMapInfo>,
 ) -> Result<Vec<AnyView>, PlaylistError> {
-    // The base_url should never fail to parse. I _could_ create a separate flow in this case that
-    // makes no attempt to insert links, but I feel that is an over-complication.
-    let base_url = Url::parse(base_url).ok();
     let mut reader = Reader::from_str(
         playlist,
         ParsingOptionsBuilder::new()
@@ -130,7 +118,6 @@ fn try_get_lines(
                             lines.push(view_from_uri_tag(UriTagViewOptions {
                                 uri,
                                 tag_inner,
-                                base_url: &base_url,
                                 uri_type: UriType::Playlist,
                                 media_sequence,
                                 is_highlighted: false,
@@ -149,7 +136,6 @@ fn try_get_lines(
                         lines.push(view_from_uri_tag(UriTagViewOptions {
                             uri,
                             tag_inner,
-                            base_url: &base_url,
                             uri_type: UriType::Playlist,
                             media_sequence,
                             is_highlighted: false,
@@ -173,7 +159,6 @@ fn try_get_lines(
                         lines.push(view_from_uri_tag(UriTagViewOptions {
                             uri,
                             tag_inner,
-                            base_url: &base_url,
                             uri_type: UriType::Map,
                             media_sequence,
                             is_highlighted,
@@ -224,7 +209,6 @@ fn try_get_lines(
                     view! {
                         <a
                             href=resolve_href(ResolveOptions {
-                                base_url: &base_url,
                                 uri,
                                 uri_type,
                                 media_sequence,
@@ -264,7 +248,6 @@ enum UriType {
 }
 
 struct ResolveOptions<'a> {
-    base_url: &'a Option<Url>,
     uri: &'a str,
     uri_type: UriType,
     media_sequence: u64,
@@ -273,57 +256,22 @@ struct ResolveOptions<'a> {
 
 fn resolve_href(opts: ResolveOptions) -> String {
     let ResolveOptions {
-        base_url,
         uri,
         uri_type,
         media_sequence,
         byterange,
     } = opts;
-    let Some(base_url) = base_url else {
-        return String::from("#");
-    };
-    if let Ok(absolute_url) = base_url.join(uri) {
-        // https://url.spec.whatwg.org/#query-percent-encode-set
-        // The query percent-encode set is the C0 control percent-encode set and U+0020 SPACE,
-        // U+0022 ("), U+0023 (#), U+003C (<), and U+003E (>).
-        const QUERY: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'#').add(b'<').add(b'>');
-        let query_encoded_link_url = utf8_percent_encode(absolute_url.as_str(), QUERY);
-        let (playlist, supplemental) = match uri_type {
-            UriType::Playlist => (query_encoded_link_url, None),
-            UriType::Segment => (
-                utf8_percent_encode(base_url.as_str(), QUERY),
-                Some(SupplementalViewQueryContext::encode_segment(
-                    query_encoded_link_url.to_string(),
-                    media_sequence,
-                    byterange,
-                )),
-            ),
-            UriType::Map => (
-                utf8_percent_encode(base_url.as_str(), QUERY),
-                Some(SupplementalViewQueryContext::encode_map(
-                    query_encoded_link_url.to_string(),
-                    media_sequence,
-                    byterange,
-                )),
-            ),
-        };
-        if let Some(supplemental) = supplemental {
-            format!(
-                "?{}={}&{}={}",
-                PLAYLIST_URL_QUERY_NAME, playlist, SUPPLEMENTAL_VIEW_QUERY_NAME, supplemental
-            )
-        } else {
-            format!("?{PLAYLIST_URL_QUERY_NAME}={playlist}")
-        }
-    } else {
-        String::from("#")
+    match uri_type {
+        UriType::Playlist => media_playlist_href(uri),
+        UriType::Segment => segment_href(uri, media_sequence, byterange),
+        UriType::Map => map_href(uri, media_sequence, byterange),
     }
+    .unwrap_or(String::from("#"))
 }
 
 struct UriTagViewOptions<'a> {
     uri: String,
     tag_inner: TagInner<'a>,
-    base_url: &'a Option<Url>,
     uri_type: UriType,
     media_sequence: u64,
     is_highlighted: bool,
@@ -334,7 +282,6 @@ fn view_from_uri_tag(opts: UriTagViewOptions) -> AnyView {
     let UriTagViewOptions {
         uri,
         tag_inner,
-        base_url,
         uri_type,
         media_sequence,
         is_highlighted,
@@ -351,7 +298,6 @@ fn view_from_uri_tag(opts: UriTagViewOptions) -> AnyView {
             <a
                 class=class
                 href=resolve_href(ResolveOptions {
-                    base_url,
                     uri: &uri,
                     uri_type,
                     media_sequence,
@@ -373,132 +319,4 @@ fn is_media_tag(tag: &unknown::Tag) -> bool {
         name.tag_type(),
         TagType::MediaMetadata | TagType::MediaSegment
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use pretty_assertions::assert_eq;
-
-    #[test]
-    fn resolve_href_should_provide_local_uri_with_query_for_relative_uri() {
-        let base_url = Url::parse("https://example.com/hls/mvp.m3u8").unwrap();
-        let uri = "hi/video-only.m3u8";
-        test_media_and_segment_href(base_url, uri, "https://example.com/hls/hi/video-only.m3u8");
-    }
-
-    #[test]
-    fn resolve_href_should_provide_local_uri_with_query_for_absolute_uri() {
-        let base_url = Url::parse("https://example.com/hls/mvp.m3u8").unwrap();
-        let uri = "https://ads.server.com/ads/hls/hi/video-only.m3u8";
-        test_media_and_segment_href(
-            base_url,
-            uri,
-            "https://ads.server.com/ads/hls/hi/video-only.m3u8",
-        );
-    }
-
-    #[test]
-    fn resolve_href_should_provide_local_uri_with_query_for_uri_stepping_out_of_base_path() {
-        let base_url = Url::parse("https://ads.com/1234/main/mvp.m3u8").unwrap();
-        let uri = "../media/3.m3u8";
-        test_media_and_segment_href(base_url, uri, "https://ads.com/1234/media/3.m3u8");
-    }
-
-    #[test]
-    fn resolve_href_does_not_need_to_escape_query_parts() {
-        let base_url = Url::parse("https://example.com/hls/mvp.m3u8").unwrap();
-        let uri = "hi/video-only.m3u8?token=1234";
-        test_media_and_segment_href(
-            base_url,
-            uri,
-            "https://example.com/hls/hi/video-only.m3u8?token=1234",
-        );
-    }
-
-    #[test]
-    fn resolve_href_should_escape_fragment() {
-        let base_url = Url::parse("https://example.com/hls/mvp.m3u8").unwrap();
-        let uri = "hi/video-only.m3u8?token=1234#fragment";
-        test_media_and_segment_href(
-            base_url,
-            uri,
-            "https://example.com/hls/hi/video-only.m3u8?token=1234%23fragment",
-        );
-    }
-
-    #[test]
-    fn resolve_href_when_no_base_should_just_resolve_to_hash() {
-        assert_eq!(
-            "#".to_string(),
-            resolve_href(ResolveOptions {
-                base_url: &None,
-                uri: "some/uri.m3u8",
-                uri_type: UriType::Playlist,
-                media_sequence: 0,
-                byterange: None
-            })
-        );
-        assert_eq!(
-            "#".to_string(),
-            resolve_href(ResolveOptions {
-                base_url: &None,
-                uri: "some/uri.m3u8",
-                uri_type: UriType::Segment,
-                media_sequence: 100,
-                byterange: None
-            })
-        );
-        assert_eq!(
-            "#".to_string(),
-            resolve_href(ResolveOptions {
-                base_url: &None,
-                uri: "some/uri.m3u8",
-                uri_type: UriType::Map,
-                media_sequence: 100,
-                byterange: None
-            })
-        );
-    }
-
-    fn test_media_and_segment_href(base_url: Url, uri: &str, expected: &str) {
-        assert_eq!(
-            format!("?playlist_url={expected}"),
-            resolve_href(ResolveOptions {
-                base_url: &Some(base_url.clone()),
-                uri,
-                uri_type: UriType::Playlist,
-                media_sequence: 0,
-                byterange: None
-            })
-        );
-        assert_eq!(
-            format!(
-                "?playlist_url={}&supplemental_view_context={}",
-                base_url.as_str(),
-                format!("SEGMENT,100,-,{expected}")
-            ),
-            resolve_href(ResolveOptions {
-                base_url: &Some(base_url.clone()),
-                uri,
-                uri_type: UriType::Segment,
-                media_sequence: 100,
-                byterange: None
-            })
-        );
-        assert_eq!(
-            format!(
-                "?playlist_url={}&supplemental_view_context={}",
-                base_url.as_str(),
-                format!("MAP,100,-,{expected}")
-            ),
-            resolve_href(ResolveOptions {
-                base_url: &Some(base_url),
-                uri,
-                uri_type: UriType::Map,
-                media_sequence: 100,
-                byterange: None
-            })
-        );
-    }
 }

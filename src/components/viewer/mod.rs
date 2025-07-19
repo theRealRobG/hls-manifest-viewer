@@ -5,8 +5,8 @@ mod playlist;
 mod preformatted;
 
 use crate::utils::{
-    network::{fetch_array_buffer, FetchError, FetchTextResponse},
-    query_codec::{MediaSegmentContext, RequestRange, SupplementalViewQueryContext},
+    network::{fetch_array_buffer, FetchError, FetchTextResponse, RequestRange},
+    query_codec::{MediaSegmentContext, SupplementalViewQueryContext},
     response::{determine_segment_type, SegmentType},
 };
 use error::ViewerError;
@@ -34,7 +34,6 @@ pub fn Viewer(
     supplemental_context: Option<String>,
 ) -> impl IntoView {
     let FetchTextResponse {
-        request_url: base_url,
         response_text: playlist,
     } = match fetch_response {
         Ok(response) => response,
@@ -50,18 +49,18 @@ pub fn Viewer(
         return view! {
             <Container>
                 <ErrorBounded>
-                    <PlaylistViewer playlist base_url />
+                    <PlaylistViewer playlist />
                 </ErrorBounded>
             </Container>
         };
     };
-    let context = match SupplementalViewQueryContext::try_decode(context.as_str()) {
+    let context = match SupplementalViewQueryContext::try_from(context.as_str()) {
         Ok(context) => context,
         Err(e) => {
             return view! {
                 <Container>
                     <ErrorBounded>
-                        <PlaylistViewer playlist base_url supplemental_showing=true />
+                        <PlaylistViewer playlist supplemental_showing=true />
                     </ErrorBounded>
                     <div class=SUPPLEMENTAL_VIEW_CLASS>
                         <ViewerError
@@ -86,7 +85,6 @@ pub fn Viewer(
                     <ErrorBounded>
                         <PlaylistViewer
                             playlist
-                            base_url
                             supplemental_showing=true
                             highlighted_segment=media_sequence
                         />
@@ -108,7 +106,6 @@ pub fn Viewer(
                     <ErrorBounded>
                         <PlaylistViewer
                             playlist
-                            base_url
                             supplemental_showing=true
                             highlighted_map_info=HighlightedMapInfo {
                                 url: url_for_playlist_viewer,

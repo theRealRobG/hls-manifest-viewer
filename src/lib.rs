@@ -9,8 +9,6 @@ mod utils;
 // Pages
 use crate::pages::{about::About, home::Home, not_found::NotFound};
 
-pub(crate) const PLAYLIST_URL_QUERY_NAME: &str = "playlist_url";
-
 /// An app router which renders the homepage and handles 404's
 #[component]
 pub fn App() -> impl IntoView {
