@@ -94,12 +94,8 @@ and I just wanted to get the site to work). This should be improved.
 The release process is handled by GitHub Actions ([pages.yml](.github/workflows/pages.yml)). But if
 you want to build for release locally then run the following command:
 ```
-trunk build --release --no-default-features --public-url "/hls-manifest-viewer"
+trunk build --release --public-url "/hls-manifest-viewer"
 ```
-The `--no-default-features` flag means that `console_log` dependency is not compiled into the
-output. I initially did this to keep the size of the output wasm module smaller, but really it only
-saves like 1KB out of about 890KB, so not really needed. That being said, it's another exercise in
-using more Cargo features for educational purposes.
 
 ## Acknowledgements
 * The genesis of this tool (for me) is the brilliant [Adaptive Bitrate Manifest Viewer][18] Chrome

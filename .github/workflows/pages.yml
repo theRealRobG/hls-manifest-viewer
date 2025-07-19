@@ -29,7 +29,7 @@ jobs:
     - name: Install trunk
       run: cargo install trunk
     - name: Build with trunk
-      run: trunk build --release --no-default-features --public-url "/${GITHUB_REPOSITORY#*/}"
+      run: trunk build --release --public-url "/${GITHUB_REPOSITORY#*/}"
     - name: Build Pages artifact
       uses: actions/upload-pages-artifact@v3.0.1
       with:
