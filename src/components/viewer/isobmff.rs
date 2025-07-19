@@ -1,5 +1,5 @@
 use crate::{
-    components::viewer::SUPPLEMENTAL_VIEW_CLASS,
+    components::viewer::ISOBMFF_VIEW_CLASS,
     utils::mp4_atom_properties::{
         get_properties, AtomProperties, AtomPropertyValue, TablePropertyValue,
     },
@@ -92,7 +92,7 @@ pub fn IsobmffViewer(data: Vec<u8>) -> mp4_atom::Result<impl IntoView> {
         index += 1;
     }
     Ok(view! {
-        <div class=SUPPLEMENTAL_VIEW_CLASS>
+        <div class=ISOBMFF_VIEW_CLASS>
             <div class=ATOMS_CLASS>{atoms}</div>
             <div class=PROPERTIES_CLASS>{properties}</div>
         </div>

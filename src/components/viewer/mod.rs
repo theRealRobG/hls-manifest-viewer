@@ -20,6 +20,7 @@ use std::collections::HashMap;
 const VIEWER_CLASS: &str = "viewer-content";
 const MAIN_VIEW_CLASS: &str = "viewer-main";
 const SUPPLEMENTAL_VIEW_CLASS: &str = "viewer-supplemental supplemental-active";
+const ISOBMFF_VIEW_CLASS: &str = "viewer-supplemental isobmff-view supplemental-active";
 const MAIN_VIEW_WITH_SUPPLEMENTAL_CLASS: &str = "viewer-main supplemental-active";
 const ERROR_CLASS: &str = "error";
 const TAG_CLASS: &str = "hls-line tag";
