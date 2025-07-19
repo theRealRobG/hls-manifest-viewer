@@ -1,5 +1,9 @@
 use crate::utils::network::RequestRange;
-use std::{error::Error, fmt::Display, num::ParseIntError};
+use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, CONTROLS};
+use std::{
+    borrow::Cow, collections::HashMap, error::Error, fmt::Display, num::ParseIntError,
+    str::Utf8Error,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MediaSegmentContext {
@@ -33,6 +37,70 @@ fn encode(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> St
         },
         url
     )
+}
+
+pub fn encode_definitions(definitions: &HashMap<String, String>) -> String {
+    // EXT-X-DEFINE:VALUE is defined to be a "quoted-string". The HLS definition for a quoted string
+    // is (https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-17#section-4.2):
+    //   * quoted-string: a string of characters within a pair of double
+    //     quotes (0x22).  The following characters MUST NOT appear in a
+    //     quoted-string: line feed (0xA), carriage return (0xD), or double
+    //     quote (0x22).  The string MUST be non-empty, unless specifically
+    //     allowed.  Quoted-string AttributeValues SHOULD be constructed so
+    //     that byte-wise comparison is sufficient to test two quoted-string
+    //     AttributeValues for equality.  Note that this implies case-
+    //     sensitive comparison.
+    // The implication is that, when looking for a separator for the values in the map, the only
+    // safe characters we have to choose are 0x0A, 0x0D, and 0x22. I suppose any are as good as
+    // each other, but stylistically, I think using new line is nicest (it will be percent encoded
+    // anyway).
+    percent_encode(
+        &definitions
+            .iter()
+            .map(|(key, value)| format!("{key}={value}"))
+            .collect::<Vec<String>>()
+            .join("\n"),
+    )
+    .to_string()
+}
+
+pub fn decode_definitions(
+    query_value: &str,
+) -> Result<HashMap<String, String>, DecodeDefinitionsError> {
+    let percent_decoded = percent_decode_str(query_value)
+        .decode_utf8()
+        .map_err(DecodeDefinitionsError::Utf8Error)?;
+    let split = percent_decoded.split('\n');
+    let mut map = HashMap::new();
+    for key_value in split {
+        let mut key_value_split = key_value.splitn(2, '=');
+        let Some(key) = key_value_split.next() else {
+            return Err(DecodeDefinitionsError::MalformedDefinitionMissingName);
+        };
+        let value = key_value_split.next().unwrap_or_default();
+        map.insert(key.to_string(), value.to_string());
+    }
+    Ok(map)
+}
+
+// https://url.spec.whatwg.org/#query-percent-encode-set
+// The query percent-encode set is the C0 control percent-encode set and U+0020 SPACE, U+0022 ("),
+// U+0023 (#), U+003C (<), and U+003E (>).
+//
+// Given that the values will be URLs contained within a query value, I also need to encode b'&' and
+// b'=', as I don't want to inadvertently split the query value if the source URL has multiple query
+// parameters.
+const QUERY: &AsciiSet = &CONTROLS
+    .add(b' ')
+    .add(b'"')
+    .add(b'#')
+    .add(b'<')
+    .add(b'>')
+    .add(b'&')
+    .add(b'=');
+
+pub fn percent_encode(value: &str) -> Cow<str> {
+    Cow::from(utf8_percent_encode(value, QUERY))
 }
 
 impl TryFrom<&str> for SupplementalViewQueryContext {
@@ -150,6 +218,21 @@ impl Display for SupplementalViewQueryContextDecodeError {
 }
 impl Error for SupplementalViewQueryContextDecodeError {}
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum DecodeDefinitionsError {
+    Utf8Error(Utf8Error),
+    MalformedDefinitionMissingName,
+}
+impl Display for DecodeDefinitionsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Utf8Error(e) => write!(f, "invalid utf-8 when percent decoding: {e}"),
+            Self::MalformedDefinitionMissingName => write!(f, "definition had no name"),
+        }
+    }
+}
+impl Error for DecodeDefinitionsError {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -217,5 +300,71 @@ mod tests {
             Ok(context),
             SupplementalViewQueryContext::try_from(string.as_str())
         );
+    }
+
+    #[test]
+    fn encode_decode_definitions_for_single_definition() {
+        let query_value = String::from("hello%3Dworld");
+        let definitions = definitions_from([("hello", "world")]);
+        assert_definitions_string_equality(
+            query_value.as_str(),
+            encode_definitions(&definitions).as_str(),
+        );
+        assert_eq!(Ok(definitions), decode_definitions(&query_value));
+    }
+
+    #[test]
+    fn encode_decode_definitions_for_multiple_definitions() {
+        let query_value = String::from("hello%3Dworld%0Ameaning%3D42%0Aquestion%3Dunknown");
+        let definitions = definitions_from([
+            ("hello", "world"),
+            ("meaning", "42"),
+            ("question", "unknown"),
+        ]);
+        assert_definitions_string_equality(
+            query_value.as_str(),
+            encode_definitions(&definitions).as_str(),
+        );
+        assert_eq!(Ok(definitions), decode_definitions(&query_value));
+    }
+
+    #[test]
+    fn encode_decode_definitions_with_some_characters_not_allowed_in_query() {
+        let query_value = String::from("first%3D%23%20%3Cwow%3E%26%3Cnow%3E%0Anext%3D%3C%3D%3E");
+        let definitions = definitions_from([("first", "# <wow>&<now>"), ("next", "<=>")]);
+        assert_definitions_string_equality(
+            query_value.as_str(),
+            encode_definitions(&definitions).as_str(),
+        );
+        assert_eq!(Ok(definitions), decode_definitions(&query_value));
+    }
+
+    fn definitions_from<const N: usize>(
+        values: [(&'static str, &'static str); N],
+    ) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        for (key, value) in values {
+            map.insert(key.to_string(), value.to_string());
+        }
+        map
+    }
+
+    fn assert_definitions_string_equality(expected: &str, actual: &str) {
+        let expected_vec = expected.split("%0A").fold(Vec::new(), |v, s| {
+            let mut vec = vec![s];
+            vec.extend(v);
+            vec
+        });
+        let actual_vec = actual.split("%0A").fold(Vec::new(), |v, s| {
+            let mut vec = vec![s];
+            vec.extend(v);
+            vec
+        });
+        for expected in &expected_vec {
+            assert!(actual_vec.contains(expected));
+        }
+        for actual in &actual_vec {
+            assert!(expected_vec.contains(actual));
+        }
     }
 }

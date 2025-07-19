@@ -1,31 +1,14 @@
 use crate::utils::{
     network::RequestRange,
-    query_codec::{encode_map, encode_segment},
+    query_codec::{encode_map, encode_segment, percent_encode},
 };
 use leptos::prelude::GetUntracked;
 use leptos_router::hooks::use_query_map;
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use std::borrow::Cow;
 use url::Url;
 
 pub const PLAYLIST_URL_QUERY_NAME: &str = "playlist_url";
 pub const SUPPLEMENTAL_VIEW_QUERY_NAME: &str = "supplemental_view_context";
-
-// https://url.spec.whatwg.org/#query-percent-encode-set
-// The query percent-encode set is the C0 control percent-encode set and U+0020 SPACE, U+0022 ("),
-// U+0023 (#), U+003C (<), and U+003E (>).
-//
-// Given that the values will be URLs contained within a query value, I also need to encode b'&' and
-// b'=', as I don't want to inadvertently split the query value if the source URL has multiple query
-// parameters.
-const QUERY: &AsciiSet = &CONTROLS
-    .add(b' ')
-    .add(b'"')
-    .add(b'#')
-    .add(b'<')
-    .add(b'>')
-    .add(b'&')
-    .add(b'=');
 
 pub fn media_playlist_href(relative_uri: &str) -> Option<String> {
     playlist_href(base_url()?, relative_uri)
@@ -71,7 +54,7 @@ fn base_url() -> Option<Url> {
 
 fn playlist_href(base_url: Url, relative_uri: &str) -> Option<String> {
     let absolute_url = base_url.join(relative_uri).ok()?;
-    let query_encoded_url = utf8_percent_encode(absolute_url.as_str(), QUERY);
+    let query_encoded_url = percent_encode(absolute_url.as_str());
     Some(format!("?{PLAYLIST_URL_QUERY_NAME}={query_encoded_url}"))
 }
 
@@ -83,8 +66,8 @@ fn media_segment_href(
     segment_type: SegmentType,
 ) -> Option<String> {
     let absolute_segment_url = base_url.join(segment_uri).ok()?;
-    let query_encoded_base_url = utf8_percent_encode(base_url.as_str(), QUERY);
-    let query_encoded_segment_url = utf8_percent_encode(absolute_segment_url.as_str(), QUERY);
+    let query_encoded_base_url = percent_encode(base_url.as_str());
+    let query_encoded_segment_url = percent_encode(absolute_segment_url.as_str());
     let encoded_supplemental_context = match segment_type {
         SegmentType::Segment => encode_segment(
             &Cow::from(query_encoded_segment_url),
