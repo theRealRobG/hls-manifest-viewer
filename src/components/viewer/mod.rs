@@ -15,6 +15,7 @@ use leptos::prelude::*;
 pub use loading::ViewerLoading;
 use playlist::{HighlightedMapInfo, PlaylistViewer};
 use preformatted::PreformattedViewer;
+use std::collections::HashMap;
 
 const VIEWER_CLASS: &str = "viewer-content";
 const MAIN_VIEW_CLASS: &str = "viewer-main";
@@ -32,6 +33,7 @@ const HIGHLIGHTED_URI_CLASS: &str = "hls-line uri highlighted";
 pub fn Viewer(
     fetch_response: Result<FetchTextResponse, FetchError>,
     supplemental_context: Option<String>,
+    imported_definitions: HashMap<String, String>,
 ) -> impl IntoView {
     let FetchTextResponse {
         response_text: playlist,
@@ -49,7 +51,7 @@ pub fn Viewer(
         return view! {
             <Container>
                 <ErrorBounded>
-                    <PlaylistViewer playlist />
+                    <PlaylistViewer playlist imported_definitions />
                 </ErrorBounded>
             </Container>
         };
@@ -60,7 +62,7 @@ pub fn Viewer(
             return view! {
                 <Container>
                     <ErrorBounded>
-                        <PlaylistViewer playlist supplemental_showing=true />
+                        <PlaylistViewer playlist imported_definitions supplemental_showing=true />
                     </ErrorBounded>
                     <div class=SUPPLEMENTAL_VIEW_CLASS>
                         <ViewerError
@@ -85,6 +87,7 @@ pub fn Viewer(
                     <ErrorBounded>
                         <PlaylistViewer
                             playlist
+                            imported_definitions
                             supplemental_showing=true
                             highlighted_segment=media_sequence
                         />
@@ -106,6 +109,7 @@ pub fn Viewer(
                     <ErrorBounded>
                         <PlaylistViewer
                             playlist
+                            imported_definitions
                             supplemental_showing=true
                             highlighted_map_info=HighlightedMapInfo {
                                 url: url_for_playlist_viewer,

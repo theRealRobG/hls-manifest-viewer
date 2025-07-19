@@ -10,16 +10,17 @@ use crate::{
     },
 };
 use leptos::{either::EitherOf3, prelude::*};
+use leptos_router::hooks::use_query_map;
 use m3u8::{
     config::ParsingOptionsBuilder,
     line::HlsLine,
     tag::{
-        hls::{self, TagInner, TagName, TagType},
+        hls::{self, define::Define, TagInner, TagName, TagType},
         known, unknown,
     },
     Reader,
 };
-use std::{error::Error, fmt::Display};
+use std::{collections::HashMap, error::Error, fmt::Display};
 
 pub struct HighlightedMapInfo {
     pub url: String,
@@ -29,6 +30,7 @@ pub struct HighlightedMapInfo {
 #[component]
 pub fn PlaylistViewer(
     playlist: String,
+    imported_definitions: HashMap<String, String>,
     #[prop(default = false)] supplemental_showing: bool,
     #[prop(optional)] highlighted_segment: Option<u64>,
     #[prop(optional)] highlighted_map_info: Option<HighlightedMapInfo>,
@@ -36,7 +38,12 @@ pub fn PlaylistViewer(
     if playlist.is_empty() {
         return Ok(EitherOf3::A(view! { <div class=MAIN_VIEW_CLASS /> }));
     }
-    match try_get_lines(&playlist, highlighted_segment, highlighted_map_info) {
+    match try_get_lines(
+        &playlist,
+        imported_definitions,
+        highlighted_segment,
+        highlighted_map_info,
+    ) {
         Ok(lines) => {
             if supplemental_showing {
                 Ok(EitherOf3::B(view! {
@@ -75,6 +82,7 @@ impl Error for PlaylistError {}
 
 fn try_get_lines(
     playlist: &str,
+    imported_definitions: HashMap<String, String>,
     highlighted_segment: Option<u64>,
     highlighted_map_info: Option<HighlightedMapInfo>,
 ) -> Result<Vec<AnyView>, PlaylistError> {
@@ -86,6 +94,7 @@ fn try_get_lines(
             .with_parsing_for_media()
             .with_parsing_for_media_sequence()
             .with_parsing_for_byterange()
+            .with_parsing_for_define()
             .with_parsing_for_i_frame_stream_inf()
             .build(),
     );
@@ -97,6 +106,7 @@ fn try_get_lines(
     let mut highlighted_one_map = false;
     let mut previous_segment_byterange_end = 0u64;
     let mut segment_byterange = None;
+    let mut local_definitions = HashMap::new();
 
     match reader.read_line() {
         Ok(Some(HlsLine::KnownTag(known::Tag::Hls(hls::Tag::M3u(tag))))) => {
@@ -122,6 +132,7 @@ fn try_get_lines(
                                 media_sequence,
                                 is_highlighted: false,
                                 byterange: None,
+                                definitions: &local_definitions,
                             }));
                         } else {
                             let line = media.into_inner();
@@ -140,6 +151,7 @@ fn try_get_lines(
                             media_sequence,
                             is_highlighted: false,
                             byterange: None,
+                            definitions: &local_definitions,
                         }));
                     }
                     hls::Tag::Map(map) => {
@@ -163,6 +175,7 @@ fn try_get_lines(
                             media_sequence,
                             is_highlighted,
                             byterange,
+                            definitions: &local_definitions,
                         }));
                     }
                     hls::Tag::MediaSequence(tag) => {
@@ -178,6 +191,39 @@ fn try_get_lines(
                         let byterange = RequestRange::from_length_with_offset(length, offset);
                         segment_byterange = Some(byterange);
                         previous_segment_byterange_end = byterange.end + 1;
+                        let line = tag.into_inner();
+                        lines.push(
+                            view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any()
+                        );
+                    }
+                    hls::Tag::Define(tag) => {
+                        match tag {
+                            Define::Name(ref name) => {
+                                local_definitions
+                                    .insert(name.name().to_string(), name.value().to_string());
+                            }
+                            Define::Import(ref import) => {
+                                let name = import.import().to_string();
+                                if let Some(value) = imported_definitions.get(&name) {
+                                    local_definitions.insert(name, value.to_string());
+                                } else {
+                                    log::error!("could not resolve EXT-X-DEFINE:IMPORT=\"{name}\"");
+                                }
+                            }
+                            Define::Queryparam(ref queryparam) => {
+                                if let Some(value) =
+                                    use_query_map().get_untracked().get(queryparam.queryparam())
+                                {
+                                    local_definitions
+                                        .insert(queryparam.queryparam().to_string(), value);
+                                } else {
+                                    let q = queryparam.queryparam();
+                                    log::error!(
+                                        "could not resolve EXT-X-DEFINE:QUERYPARAM=\"{q}\""
+                                    );
+                                }
+                            }
+                        }
                         let line = tag.into_inner();
                         lines.push(
                             view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any()
@@ -213,6 +259,7 @@ fn try_get_lines(
                                 uri_type,
                                 media_sequence,
                                 byterange,
+                                definitions: &local_definitions,
                             })
                             class=uri_class
                         >
@@ -252,6 +299,7 @@ struct ResolveOptions<'a> {
     uri_type: UriType,
     media_sequence: u64,
     byterange: Option<RequestRange>,
+    definitions: &'a HashMap<String, String>,
 }
 
 fn resolve_href(opts: ResolveOptions) -> String {
@@ -260,11 +308,12 @@ fn resolve_href(opts: ResolveOptions) -> String {
         uri_type,
         media_sequence,
         byterange,
+        definitions,
     } = opts;
     match uri_type {
-        UriType::Playlist => media_playlist_href(uri),
-        UriType::Segment => segment_href(uri, media_sequence, byterange),
-        UriType::Map => map_href(uri, media_sequence, byterange),
+        UriType::Playlist => media_playlist_href(uri, definitions),
+        UriType::Segment => segment_href(uri, media_sequence, byterange, definitions),
+        UriType::Map => map_href(uri, media_sequence, byterange, definitions),
     }
     .unwrap_or(String::from("#"))
 }
@@ -276,6 +325,7 @@ struct UriTagViewOptions<'a> {
     media_sequence: u64,
     is_highlighted: bool,
     byterange: Option<RequestRange>,
+    definitions: &'a HashMap<String, String>,
 }
 
 fn view_from_uri_tag(opts: UriTagViewOptions) -> AnyView {
@@ -286,6 +336,7 @@ fn view_from_uri_tag(opts: UriTagViewOptions) -> AnyView {
         media_sequence,
         is_highlighted,
         byterange,
+        definitions,
     } = opts;
     let line = String::from_utf8_lossy(tag_inner.value());
     let uri_index = line.find(uri.as_str()).unwrap();
@@ -302,6 +353,7 @@ fn view_from_uri_tag(opts: UriTagViewOptions) -> AnyView {
                     uri_type,
                     media_sequence,
                     byterange,
+                    definitions,
                 })
             >
                 {second}

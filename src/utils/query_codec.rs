@@ -236,6 +236,7 @@ impl Error for DecodeDefinitionsError {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::tests::assert_definitions_string_equality;
     use pretty_assertions::assert_eq;
 
     const URL: &str = "https://example.com/file.mp4";
@@ -347,24 +348,5 @@ mod tests {
             map.insert(key.to_string(), value.to_string());
         }
         map
-    }
-
-    fn assert_definitions_string_equality(expected: &str, actual: &str) {
-        let expected_vec = expected.split("%0A").fold(Vec::new(), |v, s| {
-            let mut vec = vec![s];
-            vec.extend(v);
-            vec
-        });
-        let actual_vec = actual.split("%0A").fold(Vec::new(), |v, s| {
-            let mut vec = vec![s];
-            vec.extend(v);
-            vec
-        });
-        for expected in &expected_vec {
-            assert!(actual_vec.contains(expected));
-        }
-        for actual in &actual_vec {
-            assert!(expected_vec.contains(actual));
-        }
     }
 }
