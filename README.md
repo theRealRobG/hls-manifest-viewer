@@ -32,9 +32,8 @@ interface that can be loaded in your web browser. Here are some of the goals of 
 * Provide a view for JSON links from the manifest (such as for [Content Steering][11], for the
   [X-ASSET-LIST][12] attribute in HLS Interstitials, [EXT-X-SESSION-DATA][13], etc.).
 
-So far only media playlist resolution (without handling variable substitution yet), fMP4 (including
-range requests based on `EXT-X-BYTERANGE`/`EXT-X-MAP:BYTERANGE`), and WebVTT views have been
-implemented.
+So far only media playlist resolution, fMP4 (including range requests based on `EXT-X-BYTERANGE` /
+`EXT-X-MAP:BYTERANGE`), and WebVTT views have been implemented.
 
 But ultimately, this tool is just meant to be helpful in making working with HLS easier as a player
 developer, and so there may be many other fun directions to go in. For example, an MSE player view
