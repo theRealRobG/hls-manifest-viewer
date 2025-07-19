@@ -14,9 +14,9 @@ to need to download the multivariant, figure out the absolute URLs for the media
 also download those. Add into the mix [HLS Variable Substitution][3] and this can get very boring
 very quickly. This tools hopes to put everything needed to browse HLS media in a convenient user
 interface that can be loaded in your web browser. Here are some of the goals of the tool:
-* Provide resolved navigation links for media playlist URIs in the HLS playlist that don't require
-  leaving the tool.
-* Provide a view for inspecting [Media Segments][4] within the tool.
+- [x] Provide resolved navigation links for media playlist URIs in the HLS playlist that don't
+      require leaving the tool.
+- [ ] Provide a view for inspecting [Media Segments][4] within the tool.
     * HLS has support for [MPEG-2 Transport Streams][5], [Fragmented MPEG-4][6], [Packed Audio][7],
       [WebVTT][8], and [IMSC Subtitles][9]. The highest priority for this tool is Fragmented MPEG-4
       support (mainly because it is what I deal with mostly, but also, it seems to be the defacto
@@ -25,12 +25,17 @@ interface that can be loaded in your web browser. Here are some of the goals of 
       since they are contained within Fragmented MPEG-4; however, there is a goal to provide better
       views into fMP4 contents (perhaps a view on CEA-608/708 captions, `id3` parsing within `emsg`
       atoms, etc.).
-* Provide a view for parsing SCTE35 messages found in `EXT-X-DATERANGE` tags.
-* Provide a view for visualizing what range of segments a given `EXT-X-DATERANGE` tag applies to
-  (given that `EXT-X-DATERANGE` is described using [ISO_8601][10] and can appear anywhere in the
-  playlist it isn't always easy to see if a segment is included in the range or not).
-* Provide a view for JSON links from the manifest (such as for [Content Steering][11], for the
-  [X-ASSET-LIST][12] attribute in HLS Interstitials, [EXT-X-SESSION-DATA][13], etc.).
+    - [ ] MPEG-2 Transport Streams
+    - [x] Fragmented MPEG-4
+    - [ ] Packed Audio
+    - [x] WebVTT
+    - [ ] IMSC Subtitles
+- [ ] Provide a view for parsing SCTE35 messages found in `EXT-X-DATERANGE` tags.
+- [ ] Provide a view for visualizing what range of segments a given `EXT-X-DATERANGE` tag applies to
+      (given that `EXT-X-DATERANGE` is described using [ISO_8601][10] and can appear anywhere in the
+      playlist it isn't always easy to see if a segment is included in the range or not).
+- [ ] Provide a view for JSON links from the manifest (such as for [Content Steering][11], for the
+      [X-ASSET-LIST][12] attribute in HLS Interstitials, [EXT-X-SESSION-DATA][13], etc.).
 
 So far only media playlist resolution, fMP4 (including range requests based on `EXT-X-BYTERANGE` /
 `EXT-X-MAP:BYTERANGE`), and WebVTT views have been implemented.
