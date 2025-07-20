@@ -22,6 +22,13 @@ use m3u8::{
 };
 use std::{collections::HashMap, error::Error, fmt::Display};
 
+macro_rules! tag_into_view {
+    ($tag:ident) => {{
+        let line = $tag.into_inner();
+        view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any()
+    }};
+}
+
 pub struct HighlightedMapInfo {
     pub url: String,
     pub min_media_sequence: u64,
@@ -98,22 +105,15 @@ fn try_get_lines(
             .with_parsing_for_i_frame_stream_inf()
             .build(),
     );
-    let mut lines = Vec::new();
-
-    // Segment state
-    let mut media_sequence = 0;
-    let mut is_media_playlist = false;
-    let mut highlighted_one_map = false;
-    let mut previous_segment_byterange_end = 0u64;
-    let mut segment_byterange = None;
-    let mut local_definitions = HashMap::new();
+    let mut parsing_state = ParsingState::new(
+        imported_definitions,
+        highlighted_segment,
+        highlighted_map_info,
+    );
 
     match reader.read_line() {
         Ok(Some(HlsLine::KnownTag(known::Tag::Hls(hls::Tag::M3u(tag))))) => {
-            let line = tag.into_inner();
-            lines.push(
-                view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any(),
-            );
+            parsing_state.lines.push(tag_into_view!(tag))
         }
         _ => return Err(PlaylistError::PlaylistIdentifierNotPresent),
     }
@@ -121,186 +121,177 @@ fn try_get_lines(
         match line {
             HlsLine::KnownTag(tag) => match tag {
                 known::Tag::Hls(tag) => match tag {
-                    hls::Tag::Media(media) => {
-                        if let Some(uri) = media.uri() {
-                            let uri = uri.to_string();
-                            let tag_inner = media.into_inner();
-                            lines.push(view_from_uri_tag(UriTagViewOptions {
-                                uri,
-                                tag_inner,
-                                uri_type: UriType::Playlist,
-                                media_sequence,
-                                is_highlighted: false,
-                                byterange: None,
-                                definitions: &local_definitions,
-                            }));
-                        } else {
-                            let line = media.into_inner();
-                            lines.push(
-                                view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any()
-                            );
-                        }
-                    }
-                    hls::Tag::IFrameStreamInf(iframe_stream_inf) => {
-                        let uri = iframe_stream_inf.uri().to_string();
-                        let tag_inner = iframe_stream_inf.into_inner();
-                        lines.push(view_from_uri_tag(UriTagViewOptions {
-                            uri,
-                            tag_inner,
-                            uri_type: UriType::Playlist,
-                            media_sequence,
-                            is_highlighted: false,
-                            byterange: None,
-                            definitions: &local_definitions,
-                        }));
-                    }
-                    hls::Tag::Map(map) => {
-                        let uri = map.uri().to_string();
-                        let byterange = map.byterange().map(RequestRange::from);
-                        let is_highlighted = if let Some(info) = &highlighted_map_info {
-                            !highlighted_one_map
-                                && info.min_media_sequence <= media_sequence
-                                && info.url.contains(&uri)
-                        } else {
-                            false
-                        };
-                        if is_highlighted {
-                            highlighted_one_map = true
-                        }
-                        let tag_inner = map.into_inner();
-                        lines.push(view_from_uri_tag(UriTagViewOptions {
-                            uri,
-                            tag_inner,
-                            uri_type: UriType::Map,
-                            media_sequence,
-                            is_highlighted,
-                            byterange,
-                            definitions: &local_definitions,
-                        }));
-                    }
-                    hls::Tag::MediaSequence(tag) => {
-                        media_sequence = tag.media_sequence();
-                        let line = tag.into_inner();
-                        lines.push(
-                            view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any()
-                        );
-                    }
-                    hls::Tag::Byterange(tag) => {
-                        let offset = tag.offset().unwrap_or(previous_segment_byterange_end);
-                        let length = tag.length();
-                        let byterange = RequestRange::from_length_with_offset(length, offset);
-                        segment_byterange = Some(byterange);
-                        previous_segment_byterange_end = byterange.end + 1;
-                        let line = tag.into_inner();
-                        lines.push(
-                            view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any()
-                        );
-                    }
-                    hls::Tag::Define(tag) => {
-                        match tag {
-                            Define::Name(ref name) => {
-                                local_definitions
-                                    .insert(name.name().to_string(), name.value().to_string());
-                            }
-                            Define::Import(ref import) => {
-                                let name = import.import().to_string();
-                                if let Some(value) = imported_definitions.get(&name) {
-                                    local_definitions.insert(name, value.to_string());
-                                } else {
-                                    log::error!("could not resolve EXT-X-DEFINE:IMPORT=\"{name}\"");
-                                }
-                            }
-                            Define::Queryparam(ref queryparam) => {
-                                if let Some(value) =
-                                    use_query_map().get_untracked().get(queryparam.queryparam())
-                                {
-                                    local_definitions
-                                        .insert(queryparam.queryparam().to_string(), value);
-                                } else {
-                                    let q = queryparam.queryparam();
-                                    log::error!(
-                                        "could not resolve EXT-X-DEFINE:QUERYPARAM=\"{q}\""
-                                    );
-                                }
-                            }
-                        }
-                        let line = tag.into_inner();
-                        lines.push(
-                            view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any()
-                        );
-                    }
+                    hls::Tag::Media(tag) => x_media(tag, &mut parsing_state),
+                    hls::Tag::IFrameStreamInf(tag) => x_i_frame_stream_inf(tag, &mut parsing_state),
+                    hls::Tag::Map(tag) => x_map(tag, &mut parsing_state),
+                    hls::Tag::MediaSequence(tag) => x_media_sequence(tag, &mut parsing_state),
+                    hls::Tag::Byterange(tag) => x_byterange(tag, &mut parsing_state),
+                    hls::Tag::Define(tag) => x_define(tag, &mut parsing_state),
                     tag => {
-                        let line = tag.into_inner();
-                        lines.push(
-                            view! { <p class=TAG_CLASS>{String::from_utf8_lossy(line.value())}</p> }.into_any()
-                        );
+                        parsing_state.lines.push(tag_into_view!(tag));
                     }
                 },
                 known::Tag::Custom(_) => panic!("No custom tags registered"),
             },
-            HlsLine::Uri(uri) => {
-                let uri_class = if Some(media_sequence) == highlighted_segment {
-                    HIGHLIGHTED_URI_CLASS
-                } else {
-                    URI_CLASS
-                };
-                let uri_type = if is_media_playlist {
-                    UriType::Segment
-                } else {
-                    UriType::Playlist
-                };
-                let byterange = segment_byterange;
-                segment_byterange = None;
-                lines.push(
-                    view! {
-                        <a
-                            href=resolve_href(ResolveOptions {
-                                uri,
-                                uri_type,
-                                media_sequence,
-                                byterange,
-                                definitions: &local_definitions,
-                            })
-                            class=uri_class
-                        >
-                            {uri}
-                        </a>
-                    }
-                    .into_any(),
-                );
-                media_sequence += 1;
-            }
-            HlsLine::Comment(comment) => {
-                lines.push(view! { <p class=COMMENT_CLASS>"#" {comment}</p> }.into_any())
-            }
+            HlsLine::Uri(uri) => uri_line(uri, &mut parsing_state),
+            HlsLine::Comment(comment) => parsing_state
+                .lines
+                .push(view! { <p class=COMMENT_CLASS>"#" {comment}</p> }.into_any()),
             HlsLine::UnknownTag(tag) => {
-                if !is_media_playlist && is_media_tag(&tag) {
-                    is_media_playlist = true;
+                if !parsing_state.is_media_playlist && is_media_tag(&tag) {
+                    parsing_state.is_media_playlist = true;
                 }
-                lines.push(
+                parsing_state.lines.push(
                     view! { <p class=TAG_CLASS>{String::from_utf8_lossy(tag.as_bytes())}</p> }
                         .into_any(),
                 );
             }
-            HlsLine::Blank => lines.push(view! { <p class=BLANK_CLASS></p> }.into_any()),
+            HlsLine::Blank => parsing_state
+                .lines
+                .push(view! { <p class=BLANK_CLASS></p> }.into_any()),
         }
     }
-    Ok(lines)
+    Ok(parsing_state.lines)
 }
 
-enum UriType {
-    Playlist,
-    Segment,
-    Map,
+// Uri line handling
+
+fn uri_line(uri: &str, state: &mut ParsingState) {
+    let uri_class = if Some(state.media_sequence) == state.highlighted_segment {
+        HIGHLIGHTED_URI_CLASS
+    } else {
+        URI_CLASS
+    };
+    let uri_type = if state.is_media_playlist {
+        UriType::Segment
+    } else {
+        UriType::Playlist
+    };
+    let byterange = state.segment_byterange;
+    state.segment_byterange = None;
+    state.lines.push(
+        view! {
+            <a
+                href=resolve_href(ResolveOptions {
+                    uri,
+                    uri_type,
+                    media_sequence: state.media_sequence,
+                    byterange,
+                    definitions: &state.local_definitions,
+                })
+                class=uri_class
+            >
+                {uri}
+            </a>
+        }
+        .into_any(),
+    );
+    state.media_sequence += 1;
 }
 
-struct ResolveOptions<'a> {
-    uri: &'a str,
-    uri_type: UriType,
-    media_sequence: u64,
-    byterange: Option<RequestRange>,
-    definitions: &'a HashMap<String, String>,
+// Special tag handling
+
+fn x_media(tag: hls::media::Media, state: &mut ParsingState) {
+    if let Some(uri) = tag.uri() {
+        let uri = uri.to_string();
+        let tag_inner = tag.into_inner();
+        state.lines.push(view_from_uri_tag(UriTagViewOptions {
+            uri,
+            tag_inner,
+            uri_type: UriType::Playlist,
+            media_sequence: state.media_sequence,
+            is_highlighted: false,
+            byterange: None,
+            definitions: &state.local_definitions,
+        }));
+    } else {
+        state.lines.push(tag_into_view!(tag));
+    }
 }
+
+fn x_i_frame_stream_inf(tag: hls::i_frame_stream_inf::IFrameStreamInf, state: &mut ParsingState) {
+    let uri = tag.uri().to_string();
+    let tag_inner = tag.into_inner();
+    state.lines.push(view_from_uri_tag(UriTagViewOptions {
+        uri,
+        tag_inner,
+        uri_type: UriType::Playlist,
+        media_sequence: state.media_sequence,
+        is_highlighted: false,
+        byterange: None,
+        definitions: &state.local_definitions,
+    }));
+}
+
+fn x_map(tag: hls::map::Map, state: &mut ParsingState) {
+    let uri = tag.uri().to_string();
+    let byterange = tag.byterange().map(RequestRange::from);
+    let is_highlighted = if let Some(info) = &state.highlighted_map_info {
+        !state.highlighted_one_map
+            && info.min_media_sequence <= state.media_sequence
+            && info.url.contains(&uri)
+    } else {
+        false
+    };
+    if is_highlighted {
+        state.highlighted_one_map = true
+    }
+    let tag_inner = tag.into_inner();
+    state.lines.push(view_from_uri_tag(UriTagViewOptions {
+        uri,
+        tag_inner,
+        uri_type: UriType::Map,
+        media_sequence: state.media_sequence,
+        is_highlighted,
+        byterange,
+        definitions: &state.local_definitions,
+    }));
+}
+
+fn x_media_sequence(tag: hls::media_sequence::MediaSequence, state: &mut ParsingState) {
+    state.media_sequence = tag.media_sequence();
+    state.lines.push(tag_into_view!(tag));
+}
+
+fn x_byterange(tag: hls::byterange::Byterange, state: &mut ParsingState) {
+    let offset = tag.offset().unwrap_or(state.previous_segment_byterange_end);
+    let length = tag.length();
+    let byterange = RequestRange::from_length_with_offset(length, offset);
+    state.segment_byterange = Some(byterange);
+    state.previous_segment_byterange_end = byterange.end + 1;
+    state.lines.push(tag_into_view!(tag));
+}
+
+fn x_define(tag: hls::define::Define, state: &mut ParsingState) {
+    match tag {
+        Define::Name(ref name) => {
+            state
+                .local_definitions
+                .insert(name.name().to_string(), name.value().to_string());
+        }
+        Define::Import(ref import) => {
+            let name = import.import().to_string();
+            if let Some(value) = state.imported_definitions.get(&name) {
+                state.local_definitions.insert(name, value.to_string());
+            } else {
+                log::error!("could not resolve EXT-X-DEFINE:IMPORT=\"{name}\"");
+            }
+        }
+        Define::Queryparam(ref queryparam) => {
+            if let Some(value) = use_query_map().get_untracked().get(queryparam.queryparam()) {
+                state
+                    .local_definitions
+                    .insert(queryparam.queryparam().to_string(), value);
+            } else {
+                let q = queryparam.queryparam();
+                log::error!("could not resolve EXT-X-DEFINE:QUERYPARAM=\"{q}\"");
+            }
+        }
+    }
+    state.lines.push(tag_into_view!(tag));
+}
+
+// General href utility
 
 fn resolve_href(opts: ResolveOptions) -> String {
     let ResolveOptions {
@@ -316,16 +307,6 @@ fn resolve_href(opts: ResolveOptions) -> String {
         UriType::Map => map_href(uri, media_sequence, byterange, definitions),
     }
     .unwrap_or(String::from("#"))
-}
-
-struct UriTagViewOptions<'a> {
-    uri: String,
-    tag_inner: TagInner<'a>,
-    uri_type: UriType,
-    media_sequence: u64,
-    is_highlighted: bool,
-    byterange: Option<RequestRange>,
-    definitions: &'a HashMap<String, String>,
 }
 
 fn view_from_uri_tag(opts: UriTagViewOptions) -> AnyView {
@@ -363,6 +344,8 @@ fn view_from_uri_tag(opts: UriTagViewOptions) -> AnyView {
     .into_any()
 }
 
+// Helper for determining whether playlist is mvp or media
+
 fn is_media_tag(tag: &unknown::Tag) -> bool {
     let Ok(name) = TagName::try_from(tag.name()) else {
         return false;
@@ -371,4 +354,65 @@ fn is_media_tag(tag: &unknown::Tag) -> bool {
         name.tag_type(),
         TagType::MediaMetadata | TagType::MediaSegment
     )
+}
+
+// Convenience types
+
+struct ParsingState {
+    // Passed in as parameters
+    imported_definitions: HashMap<String, String>,
+    highlighted_segment: Option<u64>,
+    highlighted_map_info: Option<HighlightedMapInfo>,
+    // Constructed by default
+    lines: Vec<AnyView>,
+    media_sequence: u64,
+    is_media_playlist: bool,
+    highlighted_one_map: bool,
+    previous_segment_byterange_end: u64,
+    segment_byterange: Option<RequestRange>,
+    local_definitions: HashMap<String, String>,
+}
+impl ParsingState {
+    fn new(
+        imported_definitions: HashMap<String, String>,
+        highlighted_segment: Option<u64>,
+        highlighted_map_info: Option<HighlightedMapInfo>,
+    ) -> Self {
+        Self {
+            imported_definitions,
+            highlighted_segment,
+            highlighted_map_info,
+            lines: Default::default(),
+            media_sequence: Default::default(),
+            is_media_playlist: Default::default(),
+            highlighted_one_map: Default::default(),
+            previous_segment_byterange_end: Default::default(),
+            segment_byterange: Default::default(),
+            local_definitions: Default::default(),
+        }
+    }
+}
+
+enum UriType {
+    Playlist,
+    Segment,
+    Map,
+}
+
+struct ResolveOptions<'a> {
+    uri: &'a str,
+    uri_type: UriType,
+    media_sequence: u64,
+    byterange: Option<RequestRange>,
+    definitions: &'a HashMap<String, String>,
+}
+
+struct UriTagViewOptions<'a> {
+    uri: String,
+    tag_inner: TagInner<'a>,
+    uri_type: UriType,
+    media_sequence: u64,
+    is_highlighted: bool,
+    byterange: Option<RequestRange>,
+    definitions: &'a HashMap<String, String>,
 }
