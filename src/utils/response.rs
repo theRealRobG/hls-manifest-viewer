@@ -41,17 +41,14 @@ fn probe_url(url: &str) -> Option<SegmentType> {
     };
     // https://developer.apple.com/documentation/http-live-streaming/hls-authoring-specification-for-apple-devices#Delivery
     url.path_segments()
-        .map(|segments| segments.last())
-        .flatten()
-        .map(|s| s.split('.').last())
-        .flatten()
-        .map(|s| match s {
+        .and_then(|mut segments| segments.next_back())
+        .and_then(|s| s.split('.').next_back())
+        .and_then(|s| match s {
             "mp4" => Some(SegmentType::Mp4),
             "m4s" => Some(SegmentType::Mp4),
             "vtt" => Some(SegmentType::WebVtt),
             _ => None,
         })
-        .flatten()
 }
 
 fn probe_data(data: &[u8]) -> Option<SegmentType> {

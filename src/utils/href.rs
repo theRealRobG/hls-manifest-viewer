@@ -94,7 +94,7 @@ fn playlist_href(
     if local_definitions.is_empty() {
         Some(format!("?{PLAYLIST_URL_QUERY_NAME}={query_encoded_url}"))
     } else {
-        let encoded_definitions = encode_definitions(&local_definitions);
+        let encoded_definitions = encode_definitions(local_definitions);
         Some(format!("?{PLAYLIST_URL_QUERY_NAME}={query_encoded_url}&{DEFINITIONS_QUERY_NAME}={encoded_definitions}"))
     }
 }
@@ -113,24 +113,19 @@ fn media_segment_href(
     let query_encoded_base_url = percent_encode(base_url.as_str());
     let query_encoded_segment_url = percent_encode(absolute_segment_url.as_str());
     let encoded_supplemental_context = match segment_type {
-        SegmentType::Segment => encode_segment(
-            &Cow::from(query_encoded_segment_url),
-            media_sequence,
-            byterange,
-        ),
-        SegmentType::Map => encode_map(
-            &Cow::from(query_encoded_segment_url),
-            media_sequence,
-            byterange,
-        ),
+        SegmentType::Segment => {
+            encode_segment(&query_encoded_segment_url, media_sequence, byterange)
+        }
+        SegmentType::Map => encode_map(&query_encoded_segment_url, media_sequence, byterange),
         SegmentType::Part { part_index } => encode_part(
-            &Cow::from(query_encoded_segment_url),
+            &query_encoded_segment_url,
             media_sequence,
             part_index,
             byterange,
         ),
     };
     if let Some(definitions_query_value) = definitions_query_value {
+        #[allow(clippy::uninlined_format_args)] // The line is too long when inlining the variables
         Some(format!(
             "?{}={}&{}={}&{}={}",
             PLAYLIST_URL_QUERY_NAME,
@@ -141,6 +136,7 @@ fn media_segment_href(
             encoded_supplemental_context,
         ))
     } else {
+        #[allow(clippy::uninlined_format_args)] // The line is too long when inlining the variables
         Some(format!(
             "?{}={}&{}={}",
             PLAYLIST_URL_QUERY_NAME,
@@ -162,7 +158,7 @@ fn replace_hls_variables<'a>(
             definitions
                 .iter()
                 .fold(uri.to_string(), |uri, (key, value)| {
-                    uri.replace(&format!("{{${key}}}"), &value)
+                    uri.replace(&format!("{{${key}}}"), value)
                 }),
         )
     }

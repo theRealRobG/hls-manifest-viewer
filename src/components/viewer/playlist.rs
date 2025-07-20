@@ -328,7 +328,7 @@ fn x_part(tag: hls::part::Part, state: &mut ParsingState) {
         state.offset_after_last_part_byterange = 0;
         None
     };
-    let is_highlighted = state.highlighted_part_info.as_ref().map_or(false, |info| {
+    let is_highlighted = state.highlighted_part_info.as_ref().is_some_and(|info| {
         info.media_sequence == state.media_sequence && info.part_index == state.part_index
     });
     let tag_inner = tag.into_inner();

@@ -565,7 +565,7 @@ pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
                         rows: avcc
                             .sequence_parameter_sets
                             .iter()
-                            .map(|bytes| vec![byte_array_from(&bytes)])
+                            .map(|bytes| vec![byte_array_from(bytes)])
                             .collect::<Vec<Vec<BasicPropertyValue>>>(),
                     }),
                 ),
@@ -576,7 +576,7 @@ pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
                         rows: avcc
                             .picture_parameter_sets
                             .iter()
-                            .map(|bytes| vec![byte_array_from(&bytes)])
+                            .map(|bytes| vec![byte_array_from(bytes)])
                             .collect::<Vec<Vec<BasicPropertyValue>>>(),
                     }),
                 ),
@@ -602,7 +602,7 @@ pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
                                 rows: ext
                                     .sequence_parameter_sets_ext
                                     .iter()
-                                    .map(|bytes| vec![byte_array_from(&bytes)])
+                                    .map(|bytes| vec![byte_array_from(bytes)])
                                     .collect::<Vec<Vec<BasicPropertyValue>>>(),
                             })
                         })
@@ -1131,7 +1131,7 @@ pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
                     }
                     mp4_atom::StszSamples::Different { sizes } => (
                         "sample_sizes",
-                        AtomPropertyValue::from(array_string_from(&sizes)),
+                        AtomPropertyValue::from(array_string_from(sizes)),
                     ),
                 },
             ],
@@ -1691,7 +1691,7 @@ fn audio_entry(
 }
 
 fn byte_array_from(bytes: &[u8]) -> BasicPropertyValue {
-    BasicPropertyValue::from(byte_array_string_from(&bytes))
+    BasicPropertyValue::from(byte_array_string_from(bytes))
 }
 
 fn byte_array_string_from(bytes: &[u8]) -> String {

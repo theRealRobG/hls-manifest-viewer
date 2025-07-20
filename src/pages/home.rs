@@ -34,14 +34,13 @@ pub fn Home() -> impl IntoView {
                 let imported_definitions = move || {
                     imported_definitions
                         .get()
-                        .map(|def| {
+                        .and_then(|def| {
                             decode_definitions(&def)
                                 .inspect_err(|e| {
                                     log::error!("query parsing for definitions failed due to {e}")
                                 })
                                 .ok()
                         })
-                        .flatten()
                         .unwrap_or(HashMap::new())
                 };
                 playlist_result
