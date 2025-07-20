@@ -1307,36 +1307,63 @@ pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
                 ),
             ],
         },
-        Any::Emsg(emsg) => AtomProperties {
-            box_name: "EventMessageBox",
-            properties: vec![
-                ("timescale", AtomPropertyValue::from(emsg.timescale)),
-                match emsg.presentation_time {
-                    mp4_atom::EmsgTimestamp::Relative(t) => {
-                        ("presentation_time_delta", AtomPropertyValue::from(t))
+        Any::Emsg(emsg) => {
+            let message_data = if &emsg.scheme_id_uri == "https://aomedia.org/emsg/ID3" {
+                let message_data_reader = std::io::Cursor::new(emsg.message_data.clone());
+                match id3::Tag::read_from2(message_data_reader) {
+                    Ok(id3_tag) => {
+                        let mut tags = Vec::new();
+                        for frame in id3_tag.frames() {
+                            let id = frame.id();
+                            let value = format!("{}", frame.content());
+                            tags.push((id, value));
+                        }
+                        AtomPropertyValue::Table(TablePropertyValue {
+                            headers: Some(vec!["id3 frame ID", "Value"]),
+                            rows: tags
+                                .iter()
+                                .map(|(name, value)| {
+                                    vec![
+                                        BasicPropertyValue::from(*name),
+                                        BasicPropertyValue::from(value),
+                                    ]
+                                })
+                                .collect(),
+                        })
                     }
-                    mp4_atom::EmsgTimestamp::Absolute(t) => {
-                        ("presentation_time", AtomPropertyValue::from(t))
-                    }
-                },
-                (
-                    "event_duration",
-                    AtomPropertyValue::from(emsg.event_duration),
-                ),
-                ("id", AtomPropertyValue::from(emsg.id)),
-                (
-                    "scheme_id_uri",
-                    AtomPropertyValue::from(&emsg.scheme_id_uri),
-                ),
-                ("value", AtomPropertyValue::from(&emsg.value)),
-                (
-                    "message_data",
-                    AtomPropertyValue::from(
+                    Err(_) => AtomPropertyValue::from(
                         String::from_utf8_lossy(&emsg.message_data).to_string(),
                     ),
-                ),
-            ],
-        },
+                }
+            } else {
+                AtomPropertyValue::from(String::from_utf8_lossy(&emsg.message_data).to_string())
+            };
+            AtomProperties {
+                box_name: "EventMessageBox",
+                properties: vec![
+                    ("timescale", AtomPropertyValue::from(emsg.timescale)),
+                    match emsg.presentation_time {
+                        mp4_atom::EmsgTimestamp::Relative(t) => {
+                            ("presentation_time_delta", AtomPropertyValue::from(t))
+                        }
+                        mp4_atom::EmsgTimestamp::Absolute(t) => {
+                            ("presentation_time", AtomPropertyValue::from(t))
+                        }
+                    },
+                    (
+                        "event_duration",
+                        AtomPropertyValue::from(emsg.event_duration),
+                    ),
+                    ("id", AtomPropertyValue::from(emsg.id)),
+                    (
+                        "scheme_id_uri",
+                        AtomPropertyValue::from(&emsg.scheme_id_uri),
+                    ),
+                    ("value", AtomPropertyValue::from(&emsg.value)),
+                    ("message_data", message_data),
+                ],
+            }
+        }
         Any::Mfhd(mfhd) => AtomProperties {
             box_name: "MovieFragmentHeaderBox",
             properties: vec![(
