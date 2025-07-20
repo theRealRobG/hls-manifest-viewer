@@ -12,13 +12,13 @@ use crate::{
 use leptos::{either::EitherOf3, prelude::*};
 use leptos_router::hooks::use_query_map;
 use m3u8::{
+    Reader,
     config::ParsingOptionsBuilder,
     line::HlsLine,
     tag::{
-        hls::{self, define::Define, TagInner, TagName, TagType},
+        hls::{self, TagInner, TagName, TagType, define::Define},
         known, unknown,
     },
-    Reader,
 };
 use std::{collections::HashMap, error::Error, fmt::Display};
 

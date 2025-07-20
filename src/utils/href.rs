@@ -95,7 +95,9 @@ fn playlist_href(
         Some(format!("?{PLAYLIST_URL_QUERY_NAME}={query_encoded_url}"))
     } else {
         let encoded_definitions = encode_definitions(local_definitions);
-        Some(format!("?{PLAYLIST_URL_QUERY_NAME}={query_encoded_url}&{DEFINITIONS_QUERY_NAME}={encoded_definitions}"))
+        Some(format!(
+            "?{PLAYLIST_URL_QUERY_NAME}={query_encoded_url}&{DEFINITIONS_QUERY_NAME}={encoded_definitions}"
+        ))
     }
 }
 

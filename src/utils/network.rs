@@ -1,9 +1,10 @@
-use std::{error::Error, fmt::Display};
 use m3u8::tag::hls::map::MapByterange;
+use std::{error::Error, fmt::Display};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    js_sys::{ArrayBuffer, TypeError, Uint8Array}, DomException, Request, Response
+    DomException, Request, Response,
+    js_sys::{ArrayBuffer, TypeError, Uint8Array},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -79,9 +80,7 @@ pub async fn fetch_text(request_url: String) -> Result<FetchTextResponse, FetchE
         .map_err(fetch_failed)?
         .as_string()
         .expect("text() on a fetch Response must provide a String");
-    Ok(FetchTextResponse {
-        response_text,
-    })
+    Ok(FetchTextResponse { response_text })
 }
 
 pub async fn fetch_array_buffer(
@@ -107,11 +106,17 @@ pub async fn fetch_array_buffer(
     })
 }
 
-async fn response_from(request_url: &str, byterange: Option<RequestRange>) -> Result<Response, FetchError> {
+async fn response_from(
+    request_url: &str,
+    byterange: Option<RequestRange>,
+) -> Result<Response, FetchError> {
     let window = web_sys::window().expect("Window must be defined");
     let request = Request::new_with_str(request_url).map_err(fetch_failed)?;
     if let Some(byterange) = byterange {
-        request.headers().set("Range", &byterange.range_header_value()).map_err(fetch_failed)?;
+        request
+            .headers()
+            .set("Range", &byterange.range_header_value())
+            .map_err(fetch_failed)?;
     }
     let response = JsFuture::from(window.fetch_with_request(&request))
         .await

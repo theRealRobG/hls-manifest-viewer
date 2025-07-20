@@ -5,9 +5,9 @@ mod playlist;
 mod preformatted;
 
 use crate::utils::{
-    network::{fetch_array_buffer, FetchError, FetchTextResponse, RequestRange},
+    network::{FetchError, FetchTextResponse, RequestRange, fetch_array_buffer},
     query_codec::{MediaSegmentContext, PartSegmentContext, SupplementalViewQueryContext},
-    response::{determine_segment_type, SegmentType},
+    response::{SegmentType, determine_segment_type},
 };
 use error::ViewerError;
 use isobmff::IsobmffViewer;

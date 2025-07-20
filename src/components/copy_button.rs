@@ -1,5 +1,5 @@
 use leptos::prelude::*;
-use leptos_use::{use_clipboard, UseClipboardReturn};
+use leptos_use::{UseClipboardReturn, use_clipboard};
 
 // Takes a closure to get the string so to only clone when the button is clicked.
 #[component]

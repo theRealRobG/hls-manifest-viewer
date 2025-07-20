@@ -1,5 +1,5 @@
 use crate::utils::network::RequestRange;
-use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, CONTROLS};
+use percent_encoding::{AsciiSet, CONTROLS, percent_decode_str, utf8_percent_encode};
 use std::{
     borrow::Cow, collections::HashMap, error::Error, fmt::Display, num::ParseIntError,
     str::Utf8Error,
