@@ -1,6 +1,6 @@
 use crate::utils::{
     network::RequestRange,
-    query_codec::{encode_definitions, encode_map, encode_segment, percent_encode},
+    query_codec::{encode_definitions, encode_map, encode_part, encode_segment, percent_encode},
 };
 use leptos::prelude::GetUntracked;
 use leptos_router::hooks::use_query_map;
@@ -47,6 +47,24 @@ pub fn map_href(
         media_sequence,
         byterange,
         SegmentType::Map,
+        definitions_query_value(),
+        definitions,
+    )
+}
+
+pub fn part_href(
+    part_uri: &str,
+    media_sequence: u64,
+    part_index: u32,
+    byterange: Option<RequestRange>,
+    definitions: &HashMap<String, String>,
+) -> Option<String> {
+    media_segment_href(
+        base_url()?,
+        part_uri,
+        media_sequence,
+        byterange,
+        SegmentType::Part { part_index },
         definitions_query_value(),
         definitions,
     )
@@ -105,6 +123,12 @@ fn media_segment_href(
             media_sequence,
             byterange,
         ),
+        SegmentType::Part { part_index } => encode_part(
+            &Cow::from(query_encoded_segment_url),
+            media_sequence,
+            part_index,
+            byterange,
+        ),
     };
     if let Some(definitions_query_value) = definitions_query_value {
         Some(format!(
@@ -148,6 +172,7 @@ fn replace_hls_variables<'a>(
 enum SegmentType {
     Segment,
     Map,
+    Part { part_index: u32 },
 }
 
 #[cfg(test)]
@@ -231,11 +256,27 @@ mod tests {
                 format!("MAP,100,-,{expected}")
             )),
             media_segment_href(
-                base_url,
+                base_url.clone(),
                 uri,
                 100,
                 None,
                 SegmentType::Map,
+                None,
+                &HashMap::new()
+            )
+        );
+        assert_eq!(
+            Some(format!(
+                "?playlist_url={}&supplemental_view_context={}",
+                base_url.as_str(),
+                format!("PART,2,100,-,{expected}")
+            )),
+            media_segment_href(
+                base_url,
+                uri,
+                100,
+                None,
+                SegmentType::Part { part_index: 2 },
                 None,
                 &HashMap::new()
             )
@@ -331,11 +372,31 @@ mod tests {
                 "MAP,100,-,https://cdn.com/hi/segment-100.mp4?token%3D1234"
             )),
             media_segment_href(
-                base_url,
+                base_url.clone(),
                 uri,
                 100,
                 None,
                 SegmentType::Map,
+                Some(query_definitions.clone()),
+                &local_definitions
+            )
+        );
+        assert_eq!(
+            Some(format!(
+                "?{}={}&{}={}&{}={}",
+                PLAYLIST_URL_QUERY_NAME,
+                "https://example.com/hls/media.m3u8",
+                DEFINITIONS_QUERY_NAME,
+                "DOMAIN%3Dhttps://cdn.com",
+                SUPPLEMENTAL_VIEW_QUERY_NAME,
+                "PART,0,100,-,https://cdn.com/hi/segment-100.mp4?token%3D1234"
+            )),
+            media_segment_href(
+                base_url,
+                uri,
+                100,
+                None,
+                SegmentType::Part { part_index: 0 },
                 Some(query_definitions),
                 &local_definitions
             )
@@ -376,11 +437,29 @@ mod tests {
                 "MAP,100,-,https://example.com/hls/hi/segment-100.mp4?token%3D1234"
             )),
             media_segment_href(
-                base_url,
+                base_url.clone(),
                 uri,
                 100,
                 None,
                 SegmentType::Map,
+                None,
+                &local_definitions
+            )
+        );
+        assert_eq!(
+            Some(format!(
+                "?{}={}&{}={}",
+                PLAYLIST_URL_QUERY_NAME,
+                "https://example.com/hls/hi/media.m3u8",
+                SUPPLEMENTAL_VIEW_QUERY_NAME,
+                "PART,0,100,-,https://example.com/hls/hi/segment-100.mp4?token%3D1234"
+            )),
+            media_segment_href(
+                base_url,
+                uri,
+                100,
+                None,
+                SegmentType::Part { part_index: 0 },
                 None,
                 &local_definitions
             )

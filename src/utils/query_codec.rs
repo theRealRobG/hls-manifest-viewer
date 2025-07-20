@@ -13,9 +13,16 @@ pub struct MediaSegmentContext {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct PartSegmentContext {
+    pub segment_context: MediaSegmentContext,
+    pub part_index: u32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum SupplementalViewQueryContext {
     Segment(MediaSegmentContext),
     Map(MediaSegmentContext),
+    Part(PartSegmentContext),
 }
 
 pub fn encode_segment(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
@@ -24,6 +31,18 @@ pub fn encode_segment(url: &str, media_sequence: u64, byterange: Option<RequestR
 
 pub fn encode_map(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
     format!("MAP,{}", encode(url, media_sequence, byterange))
+}
+
+pub fn encode_part(
+    url: &str,
+    media_sequence: u64,
+    part_index: u32,
+    byterange: Option<RequestRange>,
+) -> String {
+    format!(
+        "PART,{part_index},{}",
+        encode(url, media_sequence, byterange)
+    )
 }
 
 fn encode(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
@@ -124,6 +143,26 @@ impl TryFrom<&str> for SupplementalViewQueryContext {
                 };
                 Ok(Self::Map(MediaSegmentContext::try_from(value)?))
             }
+            "PART" => {
+                let Some(value) = split.next() else {
+                    return Err(SupplementalViewQueryContextDecodeError::EmptyContextValue);
+                };
+                let mut split = value.splitn(2, ',');
+                let Some(part_index_part) = split.next() else {
+                    return Err(SupplementalViewQueryContextDecodeError::MissingPartIndex);
+                };
+                let part_index = part_index_part
+                    .parse::<u32>()
+                    .map_err(SupplementalViewQueryContextDecodeError::PartIndexParseIntFailure)?;
+                let Some(value) = split.next() else {
+                    return Err(SupplementalViewQueryContextDecodeError::MissingMediaSequencePart);
+                };
+                let segment_context = MediaSegmentContext::try_from(value)?;
+                Ok(Self::Part(PartSegmentContext {
+                    segment_context,
+                    part_index,
+                }))
+            }
             _ => Err(SupplementalViewQueryContextDecodeError::UnknownContextType(
                 type_part.to_string(),
             )),
@@ -174,6 +213,12 @@ impl SupplementalViewQueryContext {
         match self {
             Self::Segment(c) => encode_segment(&c.url, c.media_sequence, c.byterange),
             Self::Map(c) => encode_map(&c.url, c.media_sequence, c.byterange),
+            Self::Part(p) => encode_part(
+                &p.segment_context.url,
+                p.segment_context.media_sequence,
+                p.part_index,
+                p.segment_context.byterange,
+            ),
         }
     }
 }
@@ -188,6 +233,8 @@ pub enum SupplementalViewQueryContextDecodeError {
     MissingRangePart,
     RangeParseFailure,
     MissingUrlPart,
+    MissingPartIndex,
+    PartIndexParseIntFailure(ParseIntError),
 }
 impl Display for SupplementalViewQueryContextDecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -213,6 +260,10 @@ impl Display for SupplementalViewQueryContextDecodeError {
                 write!(f, "request range information malformed")
             }
             Self::MissingUrlPart => write!(f, "missing expected url information"),
+            Self::MissingPartIndex => write!(f, "missing expected part index information"),
+            Self::PartIndexParseIntFailure(e) => {
+                write!(f, "part index failed to parse: {e}")
+            }
         }
     }
 }
@@ -274,6 +325,24 @@ mod tests {
     }
 
     #[test]
+    fn encode_decode_part_with_byterange() {
+        let string = format!("PART,0,{MS},{BYTERANGE},{URL}");
+        let context = SupplementalViewQueryContext::Part(PartSegmentContext {
+            segment_context: MediaSegmentContext {
+                url: URL.to_string(),
+                media_sequence: MS,
+                byterange: Some(BYTERANGE),
+            },
+            part_index: 0,
+        });
+        assert_eq!(string, context.encode());
+        assert_eq!(
+            Ok(context),
+            SupplementalViewQueryContext::try_from(string.as_str())
+        );
+    }
+
+    #[test]
     fn encode_decode_segment_without_byterange() {
         let string = format!("SEGMENT,{MS},-,{URL}");
         let context = SupplementalViewQueryContext::Segment(MediaSegmentContext {
@@ -295,6 +364,24 @@ mod tests {
             url: URL.to_string(),
             media_sequence: MS,
             byterange: None,
+        });
+        assert_eq!(string, context.encode());
+        assert_eq!(
+            Ok(context),
+            SupplementalViewQueryContext::try_from(string.as_str())
+        );
+    }
+
+    #[test]
+    fn encode_decode_part_without_byterange() {
+        let string = format!("PART,0,{MS},-,{URL}");
+        let context = SupplementalViewQueryContext::Part(PartSegmentContext {
+            segment_context: MediaSegmentContext {
+                url: URL.to_string(),
+                media_sequence: MS,
+                byterange: None,
+            },
+            part_index: 0,
         });
         assert_eq!(string, context.encode());
         assert_eq!(

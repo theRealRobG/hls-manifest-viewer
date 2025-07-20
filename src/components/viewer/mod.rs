@@ -6,14 +6,14 @@ mod preformatted;
 
 use crate::utils::{
     network::{fetch_array_buffer, FetchError, FetchTextResponse, RequestRange},
-    query_codec::{MediaSegmentContext, SupplementalViewQueryContext},
+    query_codec::{MediaSegmentContext, PartSegmentContext, SupplementalViewQueryContext},
     response::{determine_segment_type, SegmentType},
 };
 use error::ViewerError;
 use isobmff::IsobmffViewer;
 use leptos::prelude::*;
 pub use loading::ViewerLoading;
-use playlist::{HighlightedMapInfo, PlaylistViewer};
+use playlist::{HighlightedMapInfo, HighlightedPartInfo, PlaylistViewer};
 use preformatted::PreformattedViewer;
 use std::collections::HashMap;
 
@@ -119,6 +119,33 @@ pub fn Viewer(
                         />
                     </ErrorBounded>
                     <SupplementalSegmentView segment_url=url_for_segment_viewer byterange />
+                </Container>
+            }
+        }
+        SupplementalViewQueryContext::Part(part_segment_context) => {
+            let PartSegmentContext {
+                segment_context,
+                part_index,
+            } = part_segment_context;
+            let MediaSegmentContext {
+                url,
+                media_sequence,
+                byterange,
+            } = segment_context;
+            view! {
+                <Container>
+                    <ErrorBounded>
+                        <PlaylistViewer
+                            playlist
+                            imported_definitions
+                            supplemental_showing=true
+                            highlighted_part_info=HighlightedPartInfo {
+                                media_sequence,
+                                part_index,
+                            }
+                        />
+                    </ErrorBounded>
+                    <SupplementalSegmentView segment_url=url byterange />
                 </Container>
             }
         }
