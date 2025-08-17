@@ -11,14 +11,16 @@ use crate::{
 };
 use leptos::{either::EitherOf3, prelude::*};
 use leptos_router::hooks::use_query_map;
-use m3u8::{
-    Reader,
+use quick_m3u8::{
     config::ParsingOptionsBuilder,
-    line::HlsLine,
     tag::{
-        hls::{self, TagInner, TagName, TagType, define::Define},
-        known, unknown,
+        hls::{
+            Byterange, Define, IFrameStreamInf, Map, Media, MediaSequence, Part, Tag, TagName,
+            TagType,
+        },
+        IntoInnerTag, KnownTag, TagInner, UnknownTag,
     },
+    HlsLine, Reader,
 };
 use std::{collections::HashMap, error::Error, fmt::Display};
 
@@ -122,7 +124,7 @@ fn try_get_lines(
     );
 
     match reader.read_line() {
-        Ok(Some(HlsLine::KnownTag(known::Tag::Hls(hls::Tag::M3u(tag))))) => {
+        Ok(Some(HlsLine::KnownTag(KnownTag::Hls(Tag::M3u(tag))))) => {
             parsing_state.lines.push(tag_into_view!(tag))
         }
         _ => return Err(PlaylistError::PlaylistIdentifierNotPresent),
@@ -130,21 +132,21 @@ fn try_get_lines(
     while let Ok(Some(line)) = reader.read_line() {
         match line {
             HlsLine::KnownTag(tag) => match tag {
-                known::Tag::Hls(tag) => match tag {
-                    hls::Tag::Media(tag) => x_media(tag, &mut parsing_state),
-                    hls::Tag::IFrameStreamInf(tag) => x_i_frame_stream_inf(tag, &mut parsing_state),
-                    hls::Tag::Map(tag) => x_map(tag, &mut parsing_state),
-                    hls::Tag::MediaSequence(tag) => x_media_sequence(tag, &mut parsing_state),
-                    hls::Tag::Byterange(tag) => x_byterange(tag, &mut parsing_state),
-                    hls::Tag::Define(tag) => x_define(tag, &mut parsing_state),
-                    hls::Tag::Part(tag) => x_part(tag, &mut parsing_state),
+                KnownTag::Hls(tag) => match tag {
+                    Tag::Media(tag) => x_media(tag, &mut parsing_state),
+                    Tag::IFrameStreamInf(tag) => x_i_frame_stream_inf(tag, &mut parsing_state),
+                    Tag::Map(tag) => x_map(tag, &mut parsing_state),
+                    Tag::MediaSequence(tag) => x_media_sequence(tag, &mut parsing_state),
+                    Tag::Byterange(tag) => x_byterange(tag, &mut parsing_state),
+                    Tag::Define(tag) => x_define(tag, &mut parsing_state),
+                    Tag::Part(tag) => x_part(tag, &mut parsing_state),
                     tag => {
                         parsing_state.lines.push(tag_into_view!(tag));
                     }
                 },
-                known::Tag::Custom(_) => panic!("No custom tags registered"),
+                KnownTag::Custom(_) => panic!("No custom tags registered"),
             },
-            HlsLine::Uri(uri) => uri_line(uri, &mut parsing_state),
+            HlsLine::Uri(uri) => uri_line(&uri, &mut parsing_state),
             HlsLine::Comment(comment) => parsing_state
                 .lines
                 .push(view! { <p class=COMMENT_CLASS>"#" {comment}</p> }.into_any()),
@@ -210,7 +212,7 @@ fn uri_line(uri: &str, state: &mut ParsingState) {
 
 // Special tag handling
 
-fn x_media(tag: hls::media::Media, state: &mut ParsingState) {
+fn x_media(tag: Media, state: &mut ParsingState) {
     if let Some(uri) = tag.uri() {
         let uri = uri.to_string();
         let tag_inner = tag.into_inner();
@@ -228,7 +230,7 @@ fn x_media(tag: hls::media::Media, state: &mut ParsingState) {
     }
 }
 
-fn x_i_frame_stream_inf(tag: hls::i_frame_stream_inf::IFrameStreamInf, state: &mut ParsingState) {
+fn x_i_frame_stream_inf(tag: IFrameStreamInf, state: &mut ParsingState) {
     let uri = tag.uri().to_string();
     let tag_inner = tag.into_inner();
     state.lines.push(view_from_uri_tag(UriTagViewOptions {
@@ -242,7 +244,7 @@ fn x_i_frame_stream_inf(tag: hls::i_frame_stream_inf::IFrameStreamInf, state: &m
     }));
 }
 
-fn x_map(tag: hls::map::Map, state: &mut ParsingState) {
+fn x_map(tag: Map, state: &mut ParsingState) {
     let uri = tag.uri().to_string();
     let byterange = tag.byterange().map(RequestRange::from);
     let is_highlighted = if let Some(info) = &state.highlighted_map_info {
@@ -267,12 +269,12 @@ fn x_map(tag: hls::map::Map, state: &mut ParsingState) {
     }));
 }
 
-fn x_media_sequence(tag: hls::media_sequence::MediaSequence, state: &mut ParsingState) {
+fn x_media_sequence(tag: MediaSequence, state: &mut ParsingState) {
     state.media_sequence = tag.media_sequence();
     state.lines.push(tag_into_view!(tag));
 }
 
-fn x_byterange(tag: hls::byterange::Byterange, state: &mut ParsingState) {
+fn x_byterange(tag: Byterange, state: &mut ParsingState) {
     let offset = tag
         .offset()
         .unwrap_or(state.offset_after_last_segment_byterange);
@@ -283,7 +285,7 @@ fn x_byterange(tag: hls::byterange::Byterange, state: &mut ParsingState) {
     state.lines.push(tag_into_view!(tag));
 }
 
-fn x_define(tag: hls::define::Define, state: &mut ParsingState) {
+fn x_define(tag: Define, state: &mut ParsingState) {
     match tag {
         Define::Name(ref name) => {
             state
@@ -312,7 +314,7 @@ fn x_define(tag: hls::define::Define, state: &mut ParsingState) {
     state.lines.push(tag_into_view!(tag));
 }
 
-fn x_part(tag: hls::part::Part, state: &mut ParsingState) {
+fn x_part(tag: Part, state: &mut ParsingState) {
     let uri = tag.uri().to_string();
     // The range is a little complicated because the lack of an offset means that the current offset
     // is calculated based on the end of the previous part byterange.
@@ -410,7 +412,7 @@ fn view_from_uri_tag(opts: UriTagViewOptions) -> AnyView {
 
 // Helper for determining whether playlist is mvp or media
 
-fn is_media_tag(tag: &unknown::Tag) -> bool {
+fn is_media_tag(tag: &UnknownTag) -> bool {
     let Ok(name) = TagName::try_from(tag.name()) else {
         return false;
     };

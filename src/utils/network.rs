@@ -1,4 +1,4 @@
-use m3u8::tag::hls::map::MapByterange;
+use quick_m3u8::tag::hls::MapByterange;
 use std::{error::Error, fmt::Display};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;

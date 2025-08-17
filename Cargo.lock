@@ -703,10 +703,10 @@ dependencies = [
  "leptos_meta",
  "leptos_router",
  "log",
- "m3u8",
  "mp4-atom",
  "percent-encoding",
  "pretty_assertions",
+ "quick-m3u8",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -1180,15 +1180,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
-name = "m3u8"
-version = "0.1.0"
-source = "git+https://github.com/theRealRobG/m3u8?tag=0.2.0#1dadd9d7ad120c533ef7782dd14988b7ef75d654"
-dependencies = [
- "fast-float2",
- "memchr",
-]
-
-[[package]]
 name = "manyhow"
 version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1533,6 +1524,16 @@ dependencies = [
  "syn",
  "version_check",
  "yansi",
+]
+
+[[package]]
+name = "quick-m3u8"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "418b6a27635bc8bf17630c299af80d5ec4e91ecd5d5d54a1da1d75e0f24684e4"
+dependencies = [
+ "fast-float2",
+ "memchr",
 ]
 
 [[package]]
