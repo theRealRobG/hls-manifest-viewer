@@ -26,6 +26,8 @@ mp4-atom = "0.8.1"
 id3 = "1.16"
 console_log = "1"
 log = "0.4"
+scte35 = "0.2"
+serde_json = "=1.0.142"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

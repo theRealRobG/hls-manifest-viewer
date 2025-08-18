@@ -1,6 +1,8 @@
 use crate::utils::{
     network::RequestRange,
-    query_codec::{encode_definitions, encode_map, encode_part, encode_segment, percent_encode},
+    query_codec::{
+        encode_definitions, encode_map, encode_part, encode_scte35, encode_segment, percent_encode,
+    },
 };
 use leptos::prelude::GetUntracked;
 use leptos_router::hooks::use_query_map;
@@ -70,6 +72,16 @@ pub fn part_href(
     )
 }
 
+pub fn scte35_href(scte35_message: &str, daterange_id: &str, command_type: &str) -> Option<String> {
+    Some(media_scte35_href(
+        base_url()?,
+        definitions_query_value(),
+        scte35_message,
+        daterange_id,
+        command_type,
+    ))
+}
+
 // These functions can't be run in tests because `use_query_map` must be run from within a Leptos
 // `Router` context (tests crash otherwise). Therefore, the bulk of the logic is extracted to below
 // so that it is testable.
@@ -113,14 +125,13 @@ fn media_segment_href(
     let segment_uri = replace_hls_variables(segment_uri, local_definitions);
     let absolute_segment_url = base_url.join(&segment_uri).ok()?;
     let query_encoded_base_url = percent_encode(base_url.as_str());
-    let query_encoded_segment_url = percent_encode(absolute_segment_url.as_str());
     let encoded_supplemental_context = match segment_type {
         SegmentType::Segment => {
-            encode_segment(&query_encoded_segment_url, media_sequence, byterange)
+            encode_segment(absolute_segment_url.as_str(), media_sequence, byterange)
         }
-        SegmentType::Map => encode_map(&query_encoded_segment_url, media_sequence, byterange),
+        SegmentType::Map => encode_map(absolute_segment_url.as_str(), media_sequence, byterange),
         SegmentType::Part { part_index } => encode_part(
-            &query_encoded_segment_url,
+            absolute_segment_url.as_str(),
             media_sequence,
             part_index,
             byterange,
@@ -146,6 +157,36 @@ fn media_segment_href(
             SUPPLEMENTAL_VIEW_QUERY_NAME,
             encoded_supplemental_context,
         ))
+    }
+}
+
+fn media_scte35_href(
+    base_url: Url,
+    definitions_query_value: Option<String>,
+    scte35_message: &str,
+    daterange_id: &str,
+    command_type: &str,
+) -> String {
+    let query_encoded_base_url = percent_encode(base_url.as_str());
+    let encoded_supplemental_context = encode_scte35(command_type, daterange_id, scte35_message);
+    if let Some(definitions) = definitions_query_value {
+        format!(
+            "?{}={}&{}={}&{}={}",
+            PLAYLIST_URL_QUERY_NAME,
+            query_encoded_base_url,
+            DEFINITIONS_QUERY_NAME,
+            definitions,
+            SUPPLEMENTAL_VIEW_QUERY_NAME,
+            encoded_supplemental_context,
+        )
+    } else {
+        format!(
+            "?{}={}&{}={}",
+            PLAYLIST_URL_QUERY_NAME,
+            query_encoded_base_url,
+            SUPPLEMENTAL_VIEW_QUERY_NAME,
+            encoded_supplemental_context,
+        )
     }
 }
 

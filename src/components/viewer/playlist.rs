@@ -5,7 +5,7 @@ use super::{
 use crate::{
     components::CopyButton,
     utils::{
-        href::{map_href, media_playlist_href, part_href, segment_href},
+        href::{map_href, media_playlist_href, part_href, scte35_href, segment_href},
         network::RequestRange,
     },
 };
@@ -18,7 +18,7 @@ use quick_m3u8::{
             Byterange, Define, IFrameStreamInf, Map, Media, MediaSequence, Part, Tag, TagName,
             TagType,
         },
-        IntoInnerTag, KnownTag, TagInner, UnknownTag,
+        AttributeValue, IntoInnerTag, KnownTag, TagInner, UnknownTag,
     },
     HlsLine, Reader,
 };
@@ -41,6 +41,11 @@ pub struct HighlightedPartInfo {
     pub part_index: u32,
 }
 
+pub struct HighlightedScte35Info {
+    pub daterange_id: String,
+    pub command_type: String,
+}
+
 #[component]
 pub fn PlaylistViewer(
     playlist: String,
@@ -49,6 +54,7 @@ pub fn PlaylistViewer(
     #[prop(optional)] highlighted_segment: Option<u64>,
     #[prop(optional)] highlighted_map_info: Option<HighlightedMapInfo>,
     #[prop(optional)] highlighted_part_info: Option<HighlightedPartInfo>,
+    #[prop(optional)] highlighted_scte35_info: Option<HighlightedScte35Info>,
 ) -> Result<impl IntoView, PlaylistError> {
     if playlist.is_empty() {
         return Ok(EitherOf3::A(view! { <div class=MAIN_VIEW_CLASS /> }));
@@ -59,6 +65,7 @@ pub fn PlaylistViewer(
         highlighted_segment,
         highlighted_map_info,
         highlighted_part_info,
+        highlighted_scte35_info,
     ) {
         Ok(lines) => {
             if supplemental_showing {
@@ -102,6 +109,7 @@ fn try_get_lines(
     highlighted_segment: Option<u64>,
     highlighted_map_info: Option<HighlightedMapInfo>,
     highlighted_part_info: Option<HighlightedPartInfo>,
+    highlighted_scte35_info: Option<HighlightedScte35Info>,
 ) -> Result<Vec<AnyView>, PlaylistError> {
     let mut reader = Reader::from_str(
         playlist,
@@ -121,6 +129,7 @@ fn try_get_lines(
         highlighted_segment,
         highlighted_map_info,
         highlighted_part_info,
+        highlighted_scte35_info,
     );
 
     match reader.read_line() {
@@ -151,13 +160,17 @@ fn try_get_lines(
                 .lines
                 .push(view! { <p class=COMMENT_CLASS>"#" {comment}</p> }.into_any()),
             HlsLine::UnknownTag(tag) => {
-                if !parsing_state.is_media_playlist && is_media_tag(&tag) {
+                let tag_name = TagName::try_from(tag.name()).ok();
+                if !parsing_state.is_media_playlist && is_media_tag(&tag_name) {
                     parsing_state.is_media_playlist = true;
                 }
-                parsing_state.lines.push(
-                    view! { <p class=TAG_CLASS>{String::from_utf8_lossy(tag.as_bytes())}</p> }
-                        .into_any(),
-                );
+                match tag_name {
+                    Some(TagName::Daterange) => x_daterange(tag, &mut parsing_state),
+                    _ => parsing_state.lines.push(
+                        view! { <p class=TAG_CLASS>{String::from_utf8_lossy(tag.as_bytes())}</p> }
+                            .into_any(),
+                    ),
+                }
             }
             HlsLine::Blank => parsing_state
                 .lines
@@ -211,6 +224,205 @@ fn uri_line(uri: &str, state: &mut ParsingState) {
 }
 
 // Special tag handling
+
+fn x_daterange(tag: UnknownTag, state: &mut ParsingState) {
+    let Some(list) = tag.value().and_then(|v| v.try_as_attribute_list().ok()) else {
+        state.lines.push(
+            view! { <p class=TAG_CLASS>{String::from_utf8_lossy(tag.as_bytes())}</p> }.into_any(),
+        );
+        return;
+    };
+    let Some(id) = list
+        .get("ID")
+        .and_then(AttributeValue::quoted)
+        .map(String::from)
+    else {
+        state.lines.push(
+            view! { <p class=TAG_CLASS>{String::from_utf8_lossy(tag.as_bytes())}</p> }.into_any(),
+        );
+        return;
+    };
+    let highlighted_command = state.highlighted_scte35_info.as_ref().and_then(|info| {
+        if info.daterange_id.as_str() == &id {
+            Some(info.command_type.as_str())
+        } else {
+            None
+        }
+    });
+    let is_highlighted = |name: &str| match name {
+        "SCTE35-CMD" => highlighted_command == Some("CMD"),
+        "SCTE35-IN" => highlighted_command == Some("IN"),
+        "SCTE35-OUT" => highlighted_command == Some("OUT"),
+        _ => false,
+    };
+    enum Markup {
+        String(String),
+        LinkString {
+            href: String,
+            highlighted: bool,
+            contents: String,
+        },
+    }
+    let starting = "#EXT-X-DATERANGE:";
+    let mut components = vec![Markup::String(starting.to_string())];
+    let command_type = |attribute_name| match attribute_name {
+        "SCTE35-CMD" => "CMD",
+        "SCTE35-OUT" => "OUT",
+        "SCTE35-IN" => "IN",
+        _ => "INVALID",
+    };
+    for (name, value) in list {
+        let (view_value, value) = match value {
+            AttributeValue::Unquoted(a) => {
+                let s = String::from_utf8_lossy(a.0);
+                (s.to_string(), s)
+            }
+            AttributeValue::Quoted(s) => (format!("\"{s}\""), std::borrow::Cow::Borrowed(s)),
+        };
+        let mut last_value = components.pop().expect("value always exists");
+        match name {
+            "SCTE35-CMD" | "SCTE35-OUT" | "SCTE35-IN"
+                if scte35_href(&value, &id, command_type(name)).is_some() =>
+            {
+                let href = scte35_href(&value, &id, command_type(name)).expect("validated above");
+                match &mut last_value {
+                    Markup::String(s) => {
+                        if s != starting {
+                            s.push(',');
+                        }
+                        s.push_str(name);
+                        s.push('=');
+                        components.push(last_value);
+                    }
+                    Markup::LinkString { .. } => {
+                        components.push(last_value);
+                        components.push(Markup::String(format!(",{name}=")));
+                    }
+                }
+                let highlighted = is_highlighted(name);
+                let contents = value.to_string();
+                components.push(Markup::LinkString {
+                    href,
+                    highlighted,
+                    contents,
+                });
+            }
+            _ => match &mut last_value {
+                Markup::String(s) => {
+                    if s != starting {
+                        s.push(',');
+                    }
+                    s.push_str(name);
+                    s.push('=');
+                    s.push_str(&view_value);
+                    components.push(last_value);
+                }
+                Markup::LinkString { .. } => {
+                    components.push(last_value);
+                    components.push(Markup::String(format!(",{name}={view_value}")));
+                }
+            },
+        }
+    }
+    state.lines.push(
+        view! {
+            <p class=TAG_CLASS>
+                {components
+                    .into_iter()
+                    .map(|markup| match markup {
+                        Markup::String(s) => view! { {s} }.into_any(),
+                        Markup::LinkString { href, highlighted, contents } => {
+                            let class = if highlighted { HIGHLIGHTED } else { "" };
+                            view! {
+                                <a class=class href=href>
+                                    {contents}
+                                </a>
+                            }
+                                .into_any()
+                        }
+                    })
+                    .collect_view()}
+            </p>
+        }
+        .into_any(),
+    );
+}
+
+// fn x_daterange(tag: Daterange, state: &mut ParsingState) {
+//     let scte35_cmd = tag.scte35_cmd().into_owned();
+//     let scte35_out = tag.scte35_out().into_owned();
+//     let scte35_in = tag.scte35_in().into_owned();
+//     let highlighted_command = state.highlighted_scte35_info.as_ref().and_then(|info| {
+//         if info.daterange_id.as_str() == tag.id() {
+//             Some(info.command_type)
+//         } else {
+//             None
+//         }
+//     });
+//     let inner_tag = tag.into_inner();
+//     let bytes = inner_tag.value();
+//     let string = String::from_utf8_lossy(bytes);
+//     struct SplitInfo {
+//         start: usize,
+//         end: usize,
+//         is_highlighted: bool,
+//     }
+//     let mut split_info = Vec::new();
+//     let find_start_end = |command: Scte35CommandType, needle: &str, haystack: &str| {
+//         // Test for both no quotes and quotes, because some packagers erronously put the hex string
+//         // in quotes.
+//         const CMD: (&str, usize) = ("SCTE35-CMD=", "SCTE35-CMD=".len());
+//         const CMD_QUOTES: (&str, usize) = ("SCTE35-CMD=\"", "SCTE35-CMD=\"".len());
+//         const OUT: (&str, usize) = ("SCTE35-OUT=", "SCTE35-OUT=".len());
+//         const OUT_QUOTES: (&str, usize) = ("SCTE35-OUT=\"", "SCTE35-OUT=\"".len());
+//         const IN: (&str, usize) = ("SCTE35-IN=", "SCTE35-IN=".len());
+//         const IN_QUOTES: (&str, usize) = ("SCTE35-IN=\"", "SCTE35-IN=\"".len());
+//         let tests = match command {
+//             Scte35CommandType::Out => [CMD, CMD_QUOTES],
+//             Scte35CommandType::In => [IN, IN_QUOTES],
+//             Scte35CommandType::Cmd => [OUT, OUT_QUOTES],
+//         };
+//         let needle_len = needle.len();
+//         haystack
+//             .find(&format!("{}{}", tests[0].0, needle))
+//             .map(|n| (n + tests[0].1, n + tests[0].1 + needle_len))
+//             .or_else(|| {
+//                 haystack
+//                     .find(&format!("{}{}", tests[1].0, needle))
+//                     .map(|n| (n + tests[1].1, n + tests[1].1 + needle_len))
+//             })
+//     };
+//     if let Some(cmd) = scte35_cmd {
+//         if let Some((start, end)) = find_start_end(Scte35CommandType::Cmd, &cmd, &string) {
+//             let is_highlighted = highlighted_command == Some(Scte35CommandType::Cmd);
+//             split_info.push(SplitInfo {
+//                 start,
+//                 end,
+//                 is_highlighted,
+//             });
+//         }
+//     }
+//     if let Some(out) = scte35_out {
+//         if let Some((start, end)) = find_start_end(Scte35CommandType::Out, &out, &string) {
+//             let is_highlighted = highlighted_command == Some(Scte35CommandType::Out);
+//             split_info.push(SplitInfo {
+//                 start,
+//                 end,
+//                 is_highlighted,
+//             });
+//         }
+//     }
+//     if let Some(cue_in) = scte35_in {
+//         if let Some((start, end)) = find_start_end(Scte35CommandType::In, &cue_in, &string) {
+//             let is_highlighted = highlighted_command == Some(Scte35CommandType::In);
+//             split_info.push(SplitInfo {
+//                 start,
+//                 end,
+//                 is_highlighted,
+//             });
+//         }
+//     }
+// }
 
 fn x_media(tag: Media, state: &mut ParsingState) {
     if let Some(uri) = tag.uri() {
@@ -412,8 +624,8 @@ fn view_from_uri_tag(opts: UriTagViewOptions) -> AnyView {
 
 // Helper for determining whether playlist is mvp or media
 
-fn is_media_tag(tag: &UnknownTag) -> bool {
-    let Ok(name) = TagName::try_from(tag.name()) else {
+fn is_media_tag(name: &Option<TagName>) -> bool {
+    let Some(name) = name else {
         return false;
     };
     matches!(
@@ -430,6 +642,7 @@ struct ParsingState {
     highlighted_segment: Option<u64>,
     highlighted_map_info: Option<HighlightedMapInfo>,
     highlighted_part_info: Option<HighlightedPartInfo>,
+    highlighted_scte35_info: Option<HighlightedScte35Info>,
     // Constructed by default
     lines: Vec<AnyView>,
     media_sequence: u64,
@@ -447,12 +660,14 @@ impl ParsingState {
         highlighted_segment: Option<u64>,
         highlighted_map_info: Option<HighlightedMapInfo>,
         highlighted_part_info: Option<HighlightedPartInfo>,
+        highlighted_scte35_info: Option<HighlightedScte35Info>,
     ) -> Self {
         Self {
             imported_definitions,
             highlighted_segment,
             highlighted_map_info,
             highlighted_part_info,
+            highlighted_scte35_info,
             lines: Default::default(),
             media_sequence: Default::default(),
             part_index: Default::default(),

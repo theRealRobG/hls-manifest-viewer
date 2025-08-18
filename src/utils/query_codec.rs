@@ -19,18 +19,30 @@ pub struct PartSegmentContext {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Scte35Context {
+    pub scte35: String,
+    pub daterange_id: String,
+    pub command_type: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum SupplementalViewQueryContext {
     Segment(MediaSegmentContext),
     Map(MediaSegmentContext),
     Part(PartSegmentContext),
+    Scte35(Scte35Context),
 }
 
 pub fn encode_segment(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
-    format!("SEGMENT,{}", encode(url, media_sequence, byterange))
+    percent_encode(&format!(
+        "SEGMENT,{}",
+        encode(url, media_sequence, byterange)
+    ))
+    .to_string()
 }
 
 pub fn encode_map(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
-    format!("MAP,{}", encode(url, media_sequence, byterange))
+    percent_encode(&format!("MAP,{}", encode(url, media_sequence, byterange))).to_string()
 }
 
 pub fn encode_part(
@@ -39,10 +51,18 @@ pub fn encode_part(
     part_index: u32,
     byterange: Option<RequestRange>,
 ) -> String {
-    format!(
+    percent_encode(&format!(
         "PART,{part_index},{}",
         encode(url, media_sequence, byterange)
-    )
+    ))
+    .to_string()
+}
+
+pub fn encode_scte35(command_type: &str, daterange_id: &str, scte35: &str) -> String {
+    percent_encode(&format!(
+        "SCTE35,{command_type},{daterange_id}{SPECIAL_SEPARATOR}{scte35}"
+    ))
+    .to_string()
 }
 
 fn encode(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
@@ -57,6 +77,8 @@ fn encode(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> St
         url
     )
 }
+
+const SPECIAL_SEPARATOR: &str = "\"";
 
 pub fn encode_definitions(definitions: &HashMap<String, String>) -> String {
     // EXT-X-DEFINE:VALUE is defined to be a "quoted-string". The HLS definition for a quoted string
@@ -78,7 +100,7 @@ pub fn encode_definitions(definitions: &HashMap<String, String>) -> String {
             .iter()
             .map(|(key, value)| format!("{key}={value}"))
             .collect::<Vec<String>>()
-            .join("\n"),
+            .join(SPECIAL_SEPARATOR),
     )
     .to_string()
 }
@@ -89,7 +111,7 @@ pub fn decode_definitions(
     let percent_decoded = percent_decode_str(query_value)
         .decode_utf8()
         .map_err(DecodeDefinitionsError::Utf8Error)?;
-    let split = percent_decoded.split('\n');
+    let split = percent_decoded.split(SPECIAL_SEPARATOR);
     let mut map = HashMap::new();
     for key_value in split {
         let mut key_value_split = key_value.splitn(2, '=');
@@ -163,6 +185,30 @@ impl TryFrom<&str> for SupplementalViewQueryContext {
                     part_index,
                 }))
             }
+            "SCTE35" => {
+                let Some(value) = split.next() else {
+                    return Err(SupplementalViewQueryContextDecodeError::EmptyContextValue);
+                };
+                let mut split = value.splitn(2, ',');
+                let Some(command_type) = split.next().map(String::from) else {
+                    return Err(SupplementalViewQueryContextDecodeError::MissingCommandType);
+                };
+                let Some(rest) = split.next() else {
+                    return Err(SupplementalViewQueryContextDecodeError::MissingDaterangeId);
+                };
+                let mut split = rest.splitn(2, SPECIAL_SEPARATOR);
+                let Some(daterange_id) = split.next().map(String::from) else {
+                    return Err(SupplementalViewQueryContextDecodeError::MissingDaterangeId);
+                };
+                let Some(scte35) = split.next().map(String::from) else {
+                    return Err(SupplementalViewQueryContextDecodeError::MissingScte35Message);
+                };
+                Ok(Self::Scte35(Scte35Context {
+                    scte35,
+                    daterange_id,
+                    command_type,
+                }))
+            }
             _ => Err(SupplementalViewQueryContextDecodeError::UnknownContextType(
                 type_part.to_string(),
             )),
@@ -219,6 +265,7 @@ impl SupplementalViewQueryContext {
                 p.part_index,
                 p.segment_context.byterange,
             ),
+            Self::Scte35(s) => encode_scte35(&s.command_type, &s.daterange_id, &s.scte35),
         }
     }
 }
@@ -235,6 +282,9 @@ pub enum SupplementalViewQueryContextDecodeError {
     MissingUrlPart,
     MissingPartIndex,
     PartIndexParseIntFailure(ParseIntError),
+    MissingCommandType,
+    MissingDaterangeId,
+    MissingScte35Message,
 }
 impl Display for SupplementalViewQueryContextDecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -264,6 +314,9 @@ impl Display for SupplementalViewQueryContextDecodeError {
             Self::PartIndexParseIntFailure(e) => {
                 write!(f, "part index failed to parse: {e}")
             }
+            Self::MissingCommandType => write!(f, "missing expected scte35 command type"),
+            Self::MissingDaterangeId => write!(f, "missing expected scte35 daterange id"),
+            Self::MissingScte35Message => write!(f, "missing expected scte35 message"),
         }
     }
 }

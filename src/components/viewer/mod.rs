@@ -4,10 +4,15 @@ mod loading;
 mod playlist;
 mod preformatted;
 
-use crate::utils::{
-    network::{FetchError, FetchTextResponse, RequestRange, fetch_array_buffer},
-    query_codec::{MediaSegmentContext, PartSegmentContext, SupplementalViewQueryContext},
-    response::{SegmentType, determine_segment_type},
+use crate::{
+    components::viewer::playlist::HighlightedScte35Info,
+    utils::{
+        network::{fetch_array_buffer, FetchError, FetchTextResponse, RequestRange},
+        query_codec::{
+            MediaSegmentContext, PartSegmentContext, Scte35Context, SupplementalViewQueryContext,
+        },
+        response::{determine_segment_type, SegmentType},
+    },
 };
 use error::ViewerError;
 use isobmff::IsobmffViewer;
@@ -15,7 +20,7 @@ use leptos::prelude::*;
 pub use loading::ViewerLoading;
 use playlist::{HighlightedMapInfo, HighlightedPartInfo, PlaylistViewer};
 use preformatted::PreformattedViewer;
-use std::collections::HashMap;
+use std::{collections::HashMap, num::ParseIntError};
 
 const VIEWER_CLASS: &str = "viewer-content";
 const MAIN_VIEW_CLASS: &str = "viewer-main";
@@ -77,6 +82,47 @@ pub fn Viewer(
         }
     };
     match context {
+        SupplementalViewQueryContext::Scte35(scte35_context) => {
+            let Scte35Context {
+                scte35: message,
+                daterange_id,
+                command_type,
+            } = scte35_context;
+            let highlighted_info = HighlightedScte35Info {
+                daterange_id: daterange_id.clone(),
+                command_type: command_type.clone(),
+            };
+            view! {
+                <Container>
+                    <ErrorBounded>
+                        <PlaylistViewer
+                            playlist
+                            imported_definitions
+                            supplemental_showing=true
+                            highlighted_scte35_info=highlighted_info
+                        />
+                    </ErrorBounded>
+                    {
+                        let message = &message[2..];
+                        log::debug!("SCTE35 MESSAGE: {message}");
+                        decode_hex(message)
+                            .map_err(|e| e.to_string())
+                            .and_then(|s| {
+                                scte35::parse_splice_info_section(&s).map_err(|e| e.to_string())
+                            })
+                            .and_then(|s| {
+                                serde_json::to_string_pretty(&s).map_err(|e| e.to_string())
+                            })
+                            .and_then(|s| Ok(
+                                view! { <PreformattedViewer contents=s /> }.into_any(),
+                            ))
+                            .unwrap_or_else(|e| {
+                                view! { <ViewerError error=e.to_string() /> }.into_any()
+                            })
+                    }
+                </Container>
+            }
+        }
         SupplementalViewQueryContext::Segment(media_segment_context) => {
             let MediaSegmentContext {
                 url,
@@ -150,6 +196,13 @@ pub fn Viewer(
             }
         }
     }
+}
+
+fn decode_hex(s: &str) -> Result<Vec<u8>, ParseIntError> {
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16))
+        .collect()
 }
 
 #[component]
