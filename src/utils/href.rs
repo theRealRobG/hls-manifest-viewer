@@ -113,18 +113,13 @@ fn media_segment_href(
     let segment_uri = replace_hls_variables(segment_uri, local_definitions);
     let absolute_segment_url = base_url.join(&segment_uri).ok()?;
     let query_encoded_base_url = percent_encode(base_url.as_str());
-    let query_encoded_segment_url = percent_encode(absolute_segment_url.as_str());
+    let segment_url_as_str = absolute_segment_url.as_str();
     let encoded_supplemental_context = match segment_type {
-        SegmentType::Segment => {
-            encode_segment(&query_encoded_segment_url, media_sequence, byterange)
+        SegmentType::Segment => encode_segment(segment_url_as_str, media_sequence, byterange),
+        SegmentType::Map => encode_map(segment_url_as_str, media_sequence, byterange),
+        SegmentType::Part { part_index } => {
+            encode_part(segment_url_as_str, media_sequence, part_index, byterange)
         }
-        SegmentType::Map => encode_map(&query_encoded_segment_url, media_sequence, byterange),
-        SegmentType::Part { part_index } => encode_part(
-            &query_encoded_segment_url,
-            media_sequence,
-            part_index,
-            byterange,
-        ),
     };
     if let Some(definitions_query_value) = definitions_query_value {
         #[allow(clippy::uninlined_format_args)] // The line is too long when inlining the variables

@@ -26,11 +26,15 @@ pub enum SupplementalViewQueryContext {
 }
 
 pub fn encode_segment(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
-    format!("SEGMENT,{}", encode(url, media_sequence, byterange))
+    percent_encode(&format!(
+        "SEGMENT,{}",
+        encode(url, media_sequence, byterange)
+    ))
+    .to_string()
 }
 
 pub fn encode_map(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
-    format!("MAP,{}", encode(url, media_sequence, byterange))
+    percent_encode(&format!("MAP,{}", encode(url, media_sequence, byterange))).to_string()
 }
 
 pub fn encode_part(
@@ -39,10 +43,11 @@ pub fn encode_part(
     part_index: u32,
     byterange: Option<RequestRange>,
 ) -> String {
-    format!(
+    percent_encode(&format!(
         "PART,{part_index},{}",
         encode(url, media_sequence, byterange)
-    )
+    ))
+    .to_string()
 }
 
 fn encode(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
@@ -118,6 +123,8 @@ pub fn decode_definitions(
 // Given that the values will be URLs contained within a query value, I also need to encode b'&' and
 // b'=', as I don't want to inadvertently split the query value if the source URL has multiple query
 // parameters.
+//
+// Also add U+0025 (%) to avoid mistakes when decoding.
 const QUERY: &AsciiSet = &CONTROLS
     .add(b' ')
     .add(b'"')
@@ -125,7 +132,8 @@ const QUERY: &AsciiSet = &CONTROLS
     .add(b'<')
     .add(b'>')
     .add(b'&')
-    .add(b'=');
+    .add(b'=')
+    .add(b'%');
 
 pub fn percent_encode(value: &str) -> Cow<'_, str> {
     Cow::from(utf8_percent_encode(value, QUERY))
@@ -300,102 +308,168 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     const URL: &str = "https://example.com/file.mp4";
+    const URL_ENCODING_NEEDED: &str = "https://example.com/file.mp4?one=1&two=2";
+    const ENCODED_STR: &str = "https://example.com/file.mp4?one%3D1%26two%3D2";
     const MS: u64 = 100;
     const BYTERANGE: RequestRange = RequestRange { start: 0, end: 100 };
 
+    macro_rules! assert_codec_equality {
+        ($str:expr, $context:expr) => {
+            let string = format!($str);
+            let context = $context;
+            assert_eq!(string, context.encode());
+            assert_eq!(
+                Ok(context),
+                SupplementalViewQueryContext::try_from(string.as_str())
+            );
+        };
+        (input: $context:expr, encoded: $encoded:expr, decoded: $decoded:expr) => {
+            let encoded = format!($encoded);
+            let decoded = format!($decoded);
+            let context = $context;
+            assert_eq!(encoded, context.encode());
+            assert_eq!(
+                Ok(context),
+                SupplementalViewQueryContext::try_from(decoded.as_str())
+            );
+        };
+    }
+
     #[test]
     fn encode_decode_segment_with_byterange() {
-        let string = format!("SEGMENT,{MS},{BYTERANGE},{URL}");
-        let context = SupplementalViewQueryContext::Segment(MediaSegmentContext {
-            url: URL.to_string(),
-            media_sequence: MS,
-            byterange: Some(BYTERANGE),
-        });
-        assert_eq!(string, context.encode());
-        assert_eq!(
-            Ok(context),
-            SupplementalViewQueryContext::try_from(string.as_str())
-        )
+        assert_codec_equality!(
+            "SEGMENT,{MS},{BYTERANGE},{URL}",
+            SupplementalViewQueryContext::Segment(MediaSegmentContext {
+                url: URL.to_string(),
+                media_sequence: MS,
+                byterange: Some(BYTERANGE),
+            })
+        );
+        assert_codec_equality!(
+            input: SupplementalViewQueryContext::Segment(MediaSegmentContext {
+                url: URL_ENCODING_NEEDED.to_string(),
+                media_sequence: MS,
+                byterange: Some(BYTERANGE),
+            }),
+            encoded: "SEGMENT,{MS},{BYTERANGE},{ENCODED_STR}",
+            decoded: "SEGMENT,{MS},{BYTERANGE},{URL_ENCODING_NEEDED}"
+        );
     }
 
     #[test]
     fn encode_decode_map_with_byterange() {
-        let string = format!("MAP,{MS},{BYTERANGE},{URL}");
-        let context = SupplementalViewQueryContext::Map(MediaSegmentContext {
-            url: URL.to_string(),
-            media_sequence: MS,
-            byterange: Some(BYTERANGE),
-        });
-        assert_eq!(string, context.encode());
-        assert_eq!(
-            Ok(context),
-            SupplementalViewQueryContext::try_from(string.as_str())
+        assert_codec_equality!(
+            "MAP,{MS},{BYTERANGE},{URL}",
+            SupplementalViewQueryContext::Map(MediaSegmentContext {
+                url: URL.to_string(),
+                media_sequence: MS,
+                byterange: Some(BYTERANGE),
+            })
+        );
+        assert_codec_equality!(
+            input: SupplementalViewQueryContext::Map(MediaSegmentContext {
+                url: URL_ENCODING_NEEDED.to_string(),
+                media_sequence: MS,
+                byterange: Some(BYTERANGE),
+            }),
+            encoded: "MAP,{MS},{BYTERANGE},{ENCODED_STR}",
+            decoded: "MAP,{MS},{BYTERANGE},{URL_ENCODING_NEEDED}"
         );
     }
 
     #[test]
     fn encode_decode_part_with_byterange() {
-        let string = format!("PART,0,{MS},{BYTERANGE},{URL}");
-        let context = SupplementalViewQueryContext::Part(PartSegmentContext {
-            segment_context: MediaSegmentContext {
-                url: URL.to_string(),
-                media_sequence: MS,
-                byterange: Some(BYTERANGE),
-            },
-            part_index: 0,
-        });
-        assert_eq!(string, context.encode());
-        assert_eq!(
-            Ok(context),
-            SupplementalViewQueryContext::try_from(string.as_str())
+        assert_codec_equality!(
+            "PART,0,{MS},{BYTERANGE},{URL}",
+            SupplementalViewQueryContext::Part(PartSegmentContext {
+                segment_context: MediaSegmentContext {
+                    url: URL.to_string(),
+                    media_sequence: MS,
+                    byterange: Some(BYTERANGE),
+                },
+                part_index: 0,
+            })
+        );
+        assert_codec_equality!(
+            input: SupplementalViewQueryContext::Part(PartSegmentContext {
+                segment_context: MediaSegmentContext {
+                    url: URL_ENCODING_NEEDED.to_string(),
+                    media_sequence: MS,
+                    byterange: Some(BYTERANGE),
+                },
+                part_index: 0,
+            }),
+            encoded: "PART,0,{MS},{BYTERANGE},{ENCODED_STR}",
+            decoded: "PART,0,{MS},{BYTERANGE},{URL_ENCODING_NEEDED}"
         );
     }
 
     #[test]
     fn encode_decode_segment_without_byterange() {
-        let string = format!("SEGMENT,{MS},-,{URL}");
-        let context = SupplementalViewQueryContext::Segment(MediaSegmentContext {
-            url: URL.to_string(),
-            media_sequence: MS,
-            byterange: None,
-        });
-        assert_eq!(string, context.encode());
-        assert_eq!(
-            Ok(context),
-            SupplementalViewQueryContext::try_from(string.as_str())
+        assert_codec_equality!(
+            "SEGMENT,{MS},-,{URL}",
+            SupplementalViewQueryContext::Segment(MediaSegmentContext {
+                url: URL.to_string(),
+                media_sequence: MS,
+                byterange: None,
+            })
+        );
+        assert_codec_equality!(
+            input: SupplementalViewQueryContext::Segment(MediaSegmentContext {
+                url: URL_ENCODING_NEEDED.to_string(),
+                media_sequence: MS,
+                byterange: None,
+            }),
+            encoded: "SEGMENT,{MS},-,{ENCODED_STR}",
+            decoded: "SEGMENT,{MS},-,{URL_ENCODING_NEEDED}"
         );
     }
 
     #[test]
     fn encode_decode_map_without_byterange() {
-        let string = format!("MAP,{MS},-,{URL}");
-        let context = SupplementalViewQueryContext::Map(MediaSegmentContext {
-            url: URL.to_string(),
-            media_sequence: MS,
-            byterange: None,
-        });
-        assert_eq!(string, context.encode());
-        assert_eq!(
-            Ok(context),
-            SupplementalViewQueryContext::try_from(string.as_str())
+        assert_codec_equality!(
+            "MAP,{MS},-,{URL}",
+            SupplementalViewQueryContext::Map(MediaSegmentContext {
+                url: URL.to_string(),
+                media_sequence: MS,
+                byterange: None,
+            })
+        );
+        assert_codec_equality!(
+            input: SupplementalViewQueryContext::Map(MediaSegmentContext {
+                url: URL_ENCODING_NEEDED.to_string(),
+                media_sequence: MS,
+                byterange: None,
+            }),
+            encoded: "MAP,{MS},-,{ENCODED_STR}",
+            decoded: "MAP,{MS},-,{URL_ENCODING_NEEDED}"
         );
     }
 
     #[test]
     fn encode_decode_part_without_byterange() {
-        let string = format!("PART,0,{MS},-,{URL}");
-        let context = SupplementalViewQueryContext::Part(PartSegmentContext {
-            segment_context: MediaSegmentContext {
-                url: URL.to_string(),
-                media_sequence: MS,
-                byterange: None,
-            },
-            part_index: 0,
-        });
-        assert_eq!(string, context.encode());
-        assert_eq!(
-            Ok(context),
-            SupplementalViewQueryContext::try_from(string.as_str())
+        assert_codec_equality!(
+            "PART,0,{MS},-,{URL}",
+            SupplementalViewQueryContext::Part(PartSegmentContext {
+                segment_context: MediaSegmentContext {
+                    url: URL.to_string(),
+                    media_sequence: MS,
+                    byterange: None,
+                },
+                part_index: 0,
+            })
+        );
+        assert_codec_equality!(
+            input: SupplementalViewQueryContext::Part(PartSegmentContext {
+                segment_context: MediaSegmentContext {
+                    url: URL_ENCODING_NEEDED.to_string(),
+                    media_sequence: MS,
+                    byterange: None,
+                },
+                part_index: 0,
+            }),
+            encoded: "PART,0,{MS},-,{ENCODED_STR}",
+            decoded: "PART,0,{MS},-,{URL_ENCODING_NEEDED}"
         );
     }
 
