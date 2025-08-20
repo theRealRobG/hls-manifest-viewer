@@ -15,14 +15,13 @@ use quick_m3u8::{
     config::ParsingOptionsBuilder,
     tag::{
         hls::{
-            Byterange, Define, IFrameStreamInf, Map, Media, MediaSequence, Part, Tag, TagName,
-            TagType,
+            Byterange, Define, MapByterange, MediaSequence, PartByterange, Tag, TagName, TagType,
         },
-        IntoInnerTag, KnownTag, TagInner, UnknownTag,
+        AttributeValue, IntoInnerTag, KnownTag, UnknownTag,
     },
     HlsLine, Reader,
 };
-use std::{collections::HashMap, error::Error, fmt::Display};
+use std::{borrow::Cow, collections::HashMap, error::Error, fmt::Display};
 
 macro_rules! tag_into_view {
     ($tag:ident) => {{
@@ -107,13 +106,9 @@ fn try_get_lines(
         playlist,
         ParsingOptionsBuilder::new()
             .with_parsing_for_m3u()
-            .with_parsing_for_map()
-            .with_parsing_for_media()
             .with_parsing_for_media_sequence()
             .with_parsing_for_byterange()
             .with_parsing_for_define()
-            .with_parsing_for_i_frame_stream_inf()
-            .with_parsing_for_part()
             .build(),
     );
     let mut parsing_state = ParsingState::new(
@@ -133,13 +128,9 @@ fn try_get_lines(
         match line {
             HlsLine::KnownTag(tag) => match tag {
                 KnownTag::Hls(tag) => match tag {
-                    Tag::Media(tag) => x_media(tag, &mut parsing_state),
-                    Tag::IFrameStreamInf(tag) => x_i_frame_stream_inf(tag, &mut parsing_state),
-                    Tag::Map(tag) => x_map(tag, &mut parsing_state),
                     Tag::MediaSequence(tag) => x_media_sequence(tag, &mut parsing_state),
                     Tag::Byterange(tag) => x_byterange(tag, &mut parsing_state),
                     Tag::Define(tag) => x_define(tag, &mut parsing_state),
-                    Tag::Part(tag) => x_part(tag, &mut parsing_state),
                     tag => {
                         parsing_state.lines.push(tag_into_view!(tag));
                     }
@@ -151,13 +142,20 @@ fn try_get_lines(
                 .lines
                 .push(view! { <p class=COMMENT_CLASS>"#" {comment}</p> }.into_any()),
             HlsLine::UnknownTag(tag) => {
-                if !parsing_state.is_media_playlist && is_media_tag(&tag) {
+                let tag_name = TagName::try_from(tag.name()).ok();
+                if !parsing_state.is_media_playlist && is_media_tag(tag_name) {
                     parsing_state.is_media_playlist = true;
                 }
-                parsing_state.lines.push(
-                    view! { <p class=TAG_CLASS>{String::from_utf8_lossy(tag.as_bytes())}</p> }
-                        .into_any(),
-                );
+                match tag_name {
+                    Some(TagName::Media) => playlist_uri_tag(&tag, &mut parsing_state),
+                    Some(TagName::IFrameStreamInf) => playlist_uri_tag(&tag, &mut parsing_state),
+                    Some(TagName::Map) => x_map(&tag, &mut parsing_state),
+                    Some(TagName::Part) => x_part(&tag, &mut parsing_state),
+                    _ => parsing_state.lines.push(
+                        view! { <p class=TAG_CLASS>{String::from_utf8_lossy(tag.as_bytes())}</p> }
+                            .into_any(),
+                    ),
+                }
             }
             HlsLine::Blank => parsing_state
                 .lines
@@ -212,61 +210,50 @@ fn uri_line(uri: &str, state: &mut ParsingState) {
 
 // Special tag handling
 
-fn x_media(tag: Media, state: &mut ParsingState) {
-    if let Some(uri) = tag.uri() {
-        let uri = uri.to_string();
-        let tag_inner = tag.into_inner();
-        state.lines.push(view_from_uri_tag(UriTagViewOptions {
-            uri,
-            tag_inner,
-            uri_type: UriType::Playlist,
-            media_sequence: state.media_sequence,
-            is_highlighted: false,
-            byterange: None,
-            definitions: &state.local_definitions,
-        }));
-    } else {
-        state.lines.push(tag_into_view!(tag));
-    }
+/// Handle a tag that links to a playlist (`EXT-X-MEDIA` or `EXT-X-I-FRAME-STREAM-INF`).
+fn playlist_uri_tag(tag: &UnknownTag, state: &mut ParsingState) {
+    let markup = split_tag_as_markup(
+        tag,
+        ["URI"],
+        |_, value| {
+            resolve_href(ResolveOptions {
+                uri: value,
+                uri_type: UriType::Playlist,
+                media_sequence: state.media_sequence,
+                byterange: None,
+                definitions: &state.local_definitions,
+            })
+        },
+        |_, _| false,
+    );
+    state.lines.push(view_from_markup(markup));
 }
 
-fn x_i_frame_stream_inf(tag: IFrameStreamInf, state: &mut ParsingState) {
-    let uri = tag.uri().to_string();
-    let tag_inner = tag.into_inner();
-    state.lines.push(view_from_uri_tag(UriTagViewOptions {
-        uri,
-        tag_inner,
-        uri_type: UriType::Playlist,
-        media_sequence: state.media_sequence,
-        is_highlighted: false,
-        byterange: None,
-        definitions: &state.local_definitions,
-    }));
-}
-
-fn x_map(tag: Map, state: &mut ParsingState) {
-    let uri = tag.uri().to_string();
-    let byterange = tag.byterange().map(RequestRange::from);
-    let is_highlighted = if let Some(info) = &state.highlighted_map_info {
-        !state.highlighted_one_map
-            && info.min_media_sequence <= state.media_sequence
-            && info.url.contains(&uri)
-    } else {
-        false
-    };
-    if is_highlighted {
-        state.highlighted_one_map = true
-    }
-    let tag_inner = tag.into_inner();
-    state.lines.push(view_from_uri_tag(UriTagViewOptions {
-        uri,
-        tag_inner,
-        uri_type: UriType::Map,
-        media_sequence: state.media_sequence,
-        is_highlighted,
-        byterange,
-        definitions: &state.local_definitions,
-    }));
+fn x_map(tag: &UnknownTag, state: &mut ParsingState) {
+    let byterange = map_byterange(tag).map(RequestRange::from);
+    let markup = split_tag_as_markup(
+        tag,
+        ["URI"],
+        |_, value| {
+            resolve_href(ResolveOptions {
+                uri: value,
+                uri_type: UriType::Map,
+                media_sequence: state.media_sequence,
+                byterange,
+                definitions: &state.local_definitions,
+            })
+        },
+        |_, value| {
+            if let Some(info) = &state.highlighted_map_info {
+                !state.highlighted_one_map
+                    && info.min_media_sequence <= state.media_sequence
+                    && info.url.contains(value)
+            } else {
+                false
+            }
+        },
+    );
+    state.lines.push(view_from_markup(markup));
 }
 
 fn x_media_sequence(tag: MediaSequence, state: &mut ParsingState) {
@@ -314,11 +301,10 @@ fn x_define(tag: Define, state: &mut ParsingState) {
     state.lines.push(tag_into_view!(tag));
 }
 
-fn x_part(tag: Part, state: &mut ParsingState) {
-    let uri = tag.uri().to_string();
+fn x_part(tag: &UnknownTag, state: &mut ParsingState) {
     // The range is a little complicated because the lack of an offset means that the current offset
     // is calculated based on the end of the previous part byterange.
-    let byterange = if let Some(tag_byterange) = tag.byterange() {
+    let byterange = if let Some(tag_byterange) = part_byterange(tag) {
         let offset = tag_byterange
             .offset
             .unwrap_or(state.offset_after_last_part_byterange);
@@ -333,18 +319,23 @@ fn x_part(tag: Part, state: &mut ParsingState) {
     let is_highlighted = state.highlighted_part_info.as_ref().is_some_and(|info| {
         info.media_sequence == state.media_sequence && info.part_index == state.part_index
     });
-    let tag_inner = tag.into_inner();
-    state.lines.push(view_from_uri_tag(UriTagViewOptions {
-        uri,
-        tag_inner,
-        uri_type: UriType::Part {
-            part_index: state.part_index,
+    let markup = split_tag_as_markup(
+        tag,
+        ["URI"],
+        |_, value| {
+            resolve_href(ResolveOptions {
+                uri: value,
+                uri_type: UriType::Part {
+                    part_index: state.part_index,
+                },
+                media_sequence: state.media_sequence,
+                byterange,
+                definitions: &state.local_definitions,
+            })
         },
-        media_sequence: state.media_sequence,
-        is_highlighted,
-        byterange,
-        definitions: &state.local_definitions,
-    }));
+        |_, _| is_highlighted,
+    );
+    state.lines.push(view_from_markup(markup));
     // Based on https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-17#section-3.2
     //    Each Partial Segment has a Part Index, which is an integer indicating
     //    the position of the Partial Segment within its Parent Segment.  The
@@ -356,7 +347,7 @@ fn x_part(tag: Part, state: &mut ParsingState) {
 
 // General href utility
 
-fn resolve_href(opts: ResolveOptions) -> String {
+fn resolve_href(opts: ResolveOptions) -> Option<String> {
     let ResolveOptions {
         uri,
         uri_type,
@@ -372,54 +363,141 @@ fn resolve_href(opts: ResolveOptions) -> String {
             part_href(uri, media_sequence, part_index, byterange, definitions)
         }
     }
-    .unwrap_or(String::from("#"))
 }
 
-fn view_from_uri_tag(opts: UriTagViewOptions) -> AnyView {
-    let UriTagViewOptions {
-        uri,
-        tag_inner,
-        uri_type,
-        media_sequence,
-        is_highlighted,
-        byterange,
-        definitions,
-    } = opts;
-    let line = String::from_utf8_lossy(tag_inner.value());
-    let uri_index = line.find(uri.as_str()).unwrap();
-    let (first, second) = line.split_at(uri_index);
-    let (second, third) = second.split_at(uri.len());
-    let class = if is_highlighted { HIGHLIGHTED } else { "" };
+fn view_from_markup(markup: Vec<Markup>) -> AnyView {
     view! {
         <p class=TAG_CLASS>
-            {first}
-            <a
-                class=class
-                href=resolve_href(ResolveOptions {
-                    uri: &uri,
-                    uri_type,
-                    media_sequence,
-                    byterange,
-                    definitions,
+            {markup
+                .into_iter()
+                .map(|markup| match markup {
+                    Markup::String(s) => view! { {s} }.into_any(),
+                    Markup::Link { href, value, highlighted } => {
+                        let class = if highlighted { HIGHLIGHTED } else { "" };
+                        view! {
+                            <a class=class href=href>
+                                {value}
+                            </a>
+                        }
+                            .into_any()
+                    }
                 })
-            >
-                {second}
-            </a>{third}
+                .collect_view()}
         </p>
     }
     .into_any()
 }
 
+/// Split up a tag into markup of strings and links. The links are intended to be wrapped in anchor
+/// tags.
+///
+/// Both the `href_fn` and the `highlight_fn` take the attribute name and the attribute value as
+/// input parameters. The `href_fn` expects to return the `href` for the anchor, and if not, then
+/// the link will be merged into the `String` markup. The `highlight_fn` expects to return whether
+/// the anchor should be highlighted.
+fn split_tag_as_markup<const N: usize, HrefFn, HighlightFn>(
+    tag: &UnknownTag,
+    link_attrs: [&'static str; N],
+    href_fn: HrefFn,
+    highlight_fn: HighlightFn,
+) -> Vec<Markup>
+where
+    HrefFn: Fn(&str, &str) -> Option<String>,
+    HighlightFn: Fn(&str, &str) -> bool,
+{
+    let Some(list) = tag
+        .value()
+        .and_then(|v| v.try_as_ordered_attribute_list().ok())
+    else {
+        return vec![Markup::String(
+            String::from_utf8_lossy(tag.as_bytes()).to_string(),
+        )];
+    };
+    let mut markup = vec![];
+    // The current string holds the string markup since the last found link. Any new attribute that
+    // is not a link (or cannot be created as a link) will be pushed to this string. Once a link is
+    // found then this string will be converted to `Markup` and pushed to the `markup` vector, then
+    // will be cleared.
+    let mut current_string = format!("#EXT{}:", tag.name());
+    // The separator is used for separating attributes. The first entry is empty and it subsequently
+    // changes to `,`.
+    let mut separator = "";
+    for (name, value) in list {
+        let (value, quotes) = match value {
+            AttributeValue::Unquoted(v) => (String::from_utf8_lossy(v.0), ""),
+            AttributeValue::Quoted(s) => (Cow::Borrowed(s), "\""),
+        };
+        if link_attrs.contains(&name)
+            && let Some(href) = href_fn(name, &value)
+        {
+            let mut string = std::mem::take(&mut current_string);
+            string.push_str(separator);
+            string.push_str(name);
+            string.push('=');
+            string.push_str(quotes);
+            markup.push(Markup::String(string));
+            markup.push(Markup::Link {
+                href,
+                value: value.to_string(),
+                highlighted: highlight_fn(name, &value),
+            });
+            current_string.push_str(quotes);
+        } else {
+            current_string.push_str(separator);
+            current_string.push_str(name);
+            current_string.push('=');
+            current_string.push_str(quotes);
+            current_string.push_str(&value);
+            current_string.push_str(quotes);
+        }
+        separator = ",";
+    }
+    if !current_string.is_empty() {
+        markup.push(Markup::String(current_string));
+    }
+    markup
+}
+
 // Helper for determining whether playlist is mvp or media
 
-fn is_media_tag(tag: &UnknownTag) -> bool {
-    let Ok(name) = TagName::try_from(tag.name()) else {
-        return false;
-    };
-    matches!(
-        name.tag_type(),
-        TagType::MediaMetadata | TagType::MediaSegment
-    )
+fn is_media_tag(tag_name: Option<TagName>) -> bool {
+    if let Some(tag_name) = tag_name {
+        matches!(
+            tag_name.tag_type(),
+            TagType::MediaMetadata | TagType::MediaSegment
+        )
+    } else {
+        false
+    }
+}
+
+// Helper methods for getting byteranges for EXT-X-MAP and EXT-X-PART. These SHOULD be in quick-m3u8
+// library: https://github.com/theRealRobG/m3u8/issues/9
+
+fn map_byterange(tag: &UnknownTag) -> Option<MapByterange> {
+    tag.value()
+        .and_then(|v| v.try_as_ordered_attribute_list().ok())
+        .and_then(|v| {
+            let v = v.iter().find(|(n, _)| *n == "BYTERANGE")?;
+            let byterange_str = v.1.quoted()?;
+            let mut parts = byterange_str.splitn(2, '@');
+            let length = parts.next().and_then(|s| s.parse().ok())?;
+            let offset = parts.next().and_then(|s| s.parse().ok())?;
+            Some(MapByterange { length, offset })
+        })
+}
+
+fn part_byterange(tag: &UnknownTag) -> Option<PartByterange> {
+    tag.value()
+        .and_then(|v| v.try_as_ordered_attribute_list().ok())
+        .and_then(|v| {
+            let v = v.iter().find(|(n, _)| *n == "BYTERANGE")?;
+            let range = v.1.quoted()?;
+            let mut parts = range.splitn(2, '@');
+            let length = parts.next().and_then(|s| s.parse().ok())?;
+            let offset = parts.next().and_then(|s| s.parse().ok());
+            Some(PartByterange { length, offset })
+        })
 }
 
 // Convenience types
@@ -481,12 +559,175 @@ struct ResolveOptions<'a> {
     definitions: &'a HashMap<String, String>,
 }
 
-struct UriTagViewOptions<'a> {
-    uri: String,
-    tag_inner: TagInner<'a>,
-    uri_type: UriType,
-    media_sequence: u64,
-    is_highlighted: bool,
-    byterange: Option<RequestRange>,
-    definitions: &'a HashMap<String, String>,
+#[derive(Debug, PartialEq)]
+enum Markup {
+    String(String),
+    Link {
+        href: String,
+        value: String,
+        highlighted: bool,
+    },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+    use quick_m3u8::custom_parsing::tag::parse;
+
+    #[test]
+    fn split_as_markup_no_splits_when_no_link_attrs() {
+        let tag = tag("#EXT-X-TEST:ONE=1,TWO=2,THREE=3");
+        assert_eq!(
+            vec![Markup::String(String::from(
+                "#EXT-X-TEST:ONE=1,TWO=2,THREE=3"
+            ))],
+            split_tag_as_markup(
+                &tag,
+                ["FOUR"],
+                |_, _| { Some(String::from("test")) },
+                |_, _| { true }
+            )
+        );
+    }
+
+    #[test]
+    fn split_as_markup_no_splits_when_href_fn_returns_none() {
+        let tag = tag("#EXT-X-TEST:ONE=1,TWO=2,THREE=3");
+        assert_eq!(
+            vec![Markup::String(String::from(
+                "#EXT-X-TEST:ONE=1,TWO=2,THREE=3"
+            ))],
+            split_tag_as_markup(&tag, ["TWO"], |_, _| { None }, |_, _| { true })
+        );
+    }
+
+    #[test]
+    fn split_as_markup_handles_split_at_first_attr() {
+        // Without quotes
+        let tag_1 = tag("#EXT-X-TEST:ONE=1,TWO=2,THREE=3");
+        assert_eq!(
+            vec![
+                Markup::String(String::from("#EXT-X-TEST:ONE=")),
+                Markup::Link {
+                    href: String::from("test"),
+                    value: String::from("1"),
+                    highlighted: true
+                },
+                Markup::String(String::from(",TWO=2,THREE=3")),
+            ],
+            split_tag_as_markup(
+                &tag_1,
+                ["ONE"],
+                |_, _| { Some(String::from("test")) },
+                |_, _| { true }
+            )
+        );
+        // With quotes
+        let tag_2 = tag("#EXT-X-TEST:ONE=\"1\",TWO=\"2\",THREE=\"3\"");
+        assert_eq!(
+            vec![
+                Markup::String(String::from("#EXT-X-TEST:ONE=\"")),
+                Markup::Link {
+                    href: String::from("test"),
+                    value: String::from("1"),
+                    highlighted: true
+                },
+                Markup::String(String::from("\",TWO=\"2\",THREE=\"3\"")),
+            ],
+            split_tag_as_markup(
+                &tag_2,
+                ["ONE"],
+                |_, _| { Some(String::from("test")) },
+                |_, _| { true }
+            )
+        );
+    }
+
+    #[test]
+    fn split_as_markup_handles_split_in_middle_attr() {
+        // Without quotes
+        let tag_1 = tag("#EXT-X-TEST:ONE=1,TWO=2,THREE=3");
+        assert_eq!(
+            vec![
+                Markup::String(String::from("#EXT-X-TEST:ONE=1,TWO=")),
+                Markup::Link {
+                    href: String::from("test"),
+                    value: String::from("2"),
+                    highlighted: false
+                },
+                Markup::String(String::from(",THREE=3")),
+            ],
+            split_tag_as_markup(
+                &tag_1,
+                ["TWO"],
+                |_, _| { Some(String::from("test")) },
+                |_, _| { false }
+            )
+        );
+        // With quotes
+        let tag_2 = tag("#EXT-X-TEST:ONE=\"1\",TWO=\"2\",THREE=\"3\"");
+        assert_eq!(
+            vec![
+                Markup::String(String::from("#EXT-X-TEST:ONE=\"1\",TWO=\"")),
+                Markup::Link {
+                    href: String::from("test"),
+                    value: String::from("2"),
+                    highlighted: false
+                },
+                Markup::String(String::from("\",THREE=\"3\"")),
+            ],
+            split_tag_as_markup(
+                &tag_2,
+                ["TWO"],
+                |_, _| { Some(String::from("test")) },
+                |_, _| { false }
+            )
+        );
+    }
+
+    #[test]
+    fn split_as_markup_handles_split_as_last_attr() {
+        // Without quotes
+        let tag_1 = tag("#EXT-X-TEST:ONE=1,TWO=2,THREE=3");
+        assert_eq!(
+            vec![
+                Markup::String(String::from("#EXT-X-TEST:ONE=1,TWO=2,THREE=")),
+                Markup::Link {
+                    href: String::from("test"),
+                    value: String::from("3"),
+                    highlighted: false
+                },
+            ],
+            split_tag_as_markup(
+                &tag_1,
+                ["THREE"],
+                |_, _| { Some(String::from("test")) },
+                |_, _| { false }
+            )
+        );
+        // With quotes
+        let tag_2 = tag("#EXT-X-TEST:ONE=\"1\",TWO=\"2\",THREE=\"3\"");
+        assert_eq!(
+            vec![
+                Markup::String(String::from("#EXT-X-TEST:ONE=\"1\",TWO=\"2\",THREE=\"")),
+                Markup::Link {
+                    href: String::from("test"),
+                    value: String::from("3"),
+                    highlighted: true
+                },
+                Markup::String(String::from("\"")),
+            ],
+            split_tag_as_markup(
+                &tag_2,
+                ["THREE"],
+                |_, _| { Some(String::from("test")) },
+                |_, _| { true }
+            )
+        );
+    }
+
+    fn tag(input: &str) -> UnknownTag<'_> {
+        parse(input).expect("should be valid tag").parsed
+    }
 }
