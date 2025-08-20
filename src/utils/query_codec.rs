@@ -58,27 +58,36 @@ fn encode(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> St
     )
 }
 
+// EXT-X-DEFINE:VALUE is defined to be a "quoted-string". The HLS definition for a quoted string
+// is (https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-17#section-4.2):
+//   * quoted-string: a string of characters within a pair of double
+//     quotes (0x22).  The following characters MUST NOT appear in a
+//     quoted-string: line feed (0xA), carriage return (0xD), or double
+//     quote (0x22).  The string MUST be non-empty, unless specifically
+//     allowed.  Quoted-string AttributeValues SHOULD be constructed so
+//     that byte-wise comparison is sufficient to test two quoted-string
+//     AttributeValues for equality.  Note that this implies case-
+//     sensitive comparison.
+//
+// The implication is that, when looking for a separator for the values in the map, the only safe
+// characters we have to choose are 0x0A, 0x0D, and 0x22. When attempting to use %0A, I ran into an
+// issue that the Leptos Router is stripping the character from the updated browser location. This
+// has been raised here: https://github.com/leptos-rs/leptos/issues/4232
+//
+// For now we choose the separator to be 0x22 (double quotes). The more robust way to approach this
+// would be to encode the values we are using from the playlist (somehow), and then use whatever
+// separator we want (knowing that we would've encoded the separator character if found in the
+// playlist defined value). But, that would be a more fundamental change to the logic, and so that
+// may be an optimization I look into later on.
+const SPECIAL_SEPARATOR: &str = "\"";
+
 pub fn encode_definitions(definitions: &HashMap<String, String>) -> String {
-    // EXT-X-DEFINE:VALUE is defined to be a "quoted-string". The HLS definition for a quoted string
-    // is (https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-17#section-4.2):
-    //   * quoted-string: a string of characters within a pair of double
-    //     quotes (0x22).  The following characters MUST NOT appear in a
-    //     quoted-string: line feed (0xA), carriage return (0xD), or double
-    //     quote (0x22).  The string MUST be non-empty, unless specifically
-    //     allowed.  Quoted-string AttributeValues SHOULD be constructed so
-    //     that byte-wise comparison is sufficient to test two quoted-string
-    //     AttributeValues for equality.  Note that this implies case-
-    //     sensitive comparison.
-    // The implication is that, when looking for a separator for the values in the map, the only
-    // safe characters we have to choose are 0x0A, 0x0D, and 0x22. I suppose any are as good as
-    // each other, but stylistically, I think using new line is nicest (it will be percent encoded
-    // anyway).
     percent_encode(
         &definitions
             .iter()
             .map(|(key, value)| format!("{key}={value}"))
             .collect::<Vec<String>>()
-            .join("\n"),
+            .join(SPECIAL_SEPARATOR),
     )
     .to_string()
 }
@@ -89,7 +98,7 @@ pub fn decode_definitions(
     let percent_decoded = percent_decode_str(query_value)
         .decode_utf8()
         .map_err(DecodeDefinitionsError::Utf8Error)?;
-    let split = percent_decoded.split('\n');
+    let split = percent_decoded.split(SPECIAL_SEPARATOR);
     let mut map = HashMap::new();
     for key_value in split {
         let mut key_value_split = key_value.splitn(2, '=');
@@ -403,7 +412,7 @@ mod tests {
 
     #[test]
     fn encode_decode_definitions_for_multiple_definitions() {
-        let query_value = String::from("hello%3Dworld%0Ameaning%3D42%0Aquestion%3Dunknown");
+        let query_value = String::from("hello%3Dworld%22meaning%3D42%22question%3Dunknown");
         let definitions = definitions_from([
             ("hello", "world"),
             ("meaning", "42"),
@@ -418,7 +427,7 @@ mod tests {
 
     #[test]
     fn encode_decode_definitions_with_some_characters_not_allowed_in_query() {
-        let query_value = String::from("first%3D%23%20%3Cwow%3E%26%3Cnow%3E%0Anext%3D%3C%3D%3E");
+        let query_value = String::from("first%3D%23%20%3Cwow%3E%26%3Cnow%3E%22next%3D%3C%3D%3E");
         let definitions = definitions_from([("first", "# <wow>&<now>"), ("next", "<=>")]);
         assert_definitions_string_equality(
             query_value.as_str(),

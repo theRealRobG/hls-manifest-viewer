@@ -321,7 +321,7 @@ mod tests {
             .next()
             .expect("definitions query value should be defined");
         assert_definitions_string_equality(
-            "DOMAIN%3Dhttps://cdn.com%0ATOKEN%3D1234",
+            "DOMAIN%3Dhttps://cdn.com%22TOKEN%3D1234",
             definitions_query_value,
         );
     }
