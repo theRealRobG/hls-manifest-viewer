@@ -18,11 +18,46 @@ pub struct PartSegmentContext {
     pub part_index: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Scte35CommandType {
+    Out,
+    In,
+    Cmd,
+}
+impl Display for Scte35CommandType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Out => write!(f, "OUT"),
+            Self::In => write!(f, "IN"),
+            Self::Cmd => write!(f, "CMD"),
+        }
+    }
+}
+impl TryFrom<&str> for Scte35CommandType {
+    type Error = InvalidScte35CommandType;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "OUT" => Ok(Self::Out),
+            "IN" => Ok(Self::In),
+            "CMD" => Ok(Self::Cmd),
+            _ => Err(InvalidScte35CommandType(value.to_string())),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Scte35Context {
+    pub message: String,
+    pub daterange_id: String,
+    pub command_type: Scte35CommandType,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum SupplementalViewQueryContext {
     Segment(MediaSegmentContext),
     Map(MediaSegmentContext),
     Part(PartSegmentContext),
+    Scte35(Scte35Context),
 }
 
 pub fn encode_segment(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
@@ -46,6 +81,13 @@ pub fn encode_part(
     percent_encode(&format!(
         "PART,{part_index},{}",
         encode(url, media_sequence, byterange)
+    ))
+    .to_string()
+}
+
+pub fn encode_scte35(message: &str, daterange_id: &str, command_type: Scte35CommandType) -> String {
+    percent_encode(&format!(
+        "SCTE35,{command_type},{daterange_id}{SPECIAL_SEPARATOR}{message}"
     ))
     .to_string()
 }
@@ -180,6 +222,31 @@ impl TryFrom<&str> for SupplementalViewQueryContext {
                     part_index,
                 }))
             }
+            "SCTE35" => {
+                let Some(value) = split.next() else {
+                    return Err(SupplementalViewQueryContextDecodeError::EmptyContextValue);
+                };
+                let mut split = value.splitn(2, ',');
+                let Some(command_type) = split.next() else {
+                    return Err(SupplementalViewQueryContextDecodeError::MissingCommandType);
+                };
+                let command_type = Scte35CommandType::try_from(command_type)?;
+                let Some(rest) = split.next() else {
+                    return Err(SupplementalViewQueryContextDecodeError::MissingDaterangeId);
+                };
+                let mut split = rest.splitn(2, SPECIAL_SEPARATOR);
+                let Some(daterange_id) = split.next().map(String::from) else {
+                    return Err(SupplementalViewQueryContextDecodeError::MissingDaterangeId);
+                };
+                let Some(message) = split.next().map(String::from) else {
+                    return Err(SupplementalViewQueryContextDecodeError::MissingScte35Message);
+                };
+                Ok(Self::Scte35(Scte35Context {
+                    message,
+                    daterange_id,
+                    command_type,
+                }))
+            }
             _ => Err(SupplementalViewQueryContextDecodeError::UnknownContextType(
                 type_part.to_string(),
             )),
@@ -236,6 +303,7 @@ impl SupplementalViewQueryContext {
                 p.part_index,
                 p.segment_context.byterange,
             ),
+            Self::Scte35(s) => encode_scte35(&s.message, &s.daterange_id, s.command_type),
         }
     }
 }
@@ -252,6 +320,10 @@ pub enum SupplementalViewQueryContextDecodeError {
     MissingUrlPart,
     MissingPartIndex,
     PartIndexParseIntFailure(ParseIntError),
+    MissingCommandType,
+    InvalidCommandType(InvalidScte35CommandType),
+    MissingDaterangeId,
+    MissingScte35Message,
 }
 impl Display for SupplementalViewQueryContextDecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -281,10 +353,28 @@ impl Display for SupplementalViewQueryContextDecodeError {
             Self::PartIndexParseIntFailure(e) => {
                 write!(f, "part index failed to parse: {e}")
             }
+            Self::MissingCommandType => write!(f, "missing expected scte35 command type"),
+            Self::InvalidCommandType(e) => e.fmt(f),
+            Self::MissingDaterangeId => write!(f, "missing expected scte35 daterange id"),
+            Self::MissingScte35Message => write!(f, "missing expected scte35 message"),
         }
     }
 }
 impl Error for SupplementalViewQueryContextDecodeError {}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct InvalidScte35CommandType(String);
+impl Display for InvalidScte35CommandType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "scte35 command type {} is invalid", self.0)
+    }
+}
+impl Error for InvalidScte35CommandType {}
+impl From<InvalidScte35CommandType> for SupplementalViewQueryContextDecodeError {
+    fn from(value: InvalidScte35CommandType) -> Self {
+        Self::InvalidCommandType(value)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DecodeDefinitionsError {
@@ -474,6 +564,45 @@ mod tests {
     }
 
     #[test]
+    fn encode_scte35_should_encode_out() {
+        assert_codec_equality!(
+            input: SupplementalViewQueryContext::Scte35(Scte35Context {
+                message: String::from(SCTE35_OUT_MESSAGE),
+                daterange_id: String::from("0x22-1-1755722246"),
+                command_type: Scte35CommandType::Out
+            }),
+            encoded: "SCTE35,OUT,0x22-1-1755722246%22{SCTE35_OUT_MESSAGE}",
+            decoded: "SCTE35,OUT,0x22-1-1755722246\"{SCTE35_OUT_MESSAGE}"
+        );
+    }
+
+    #[test]
+    fn encode_scte35_should_encode_in() {
+        assert_codec_equality!(
+            input: SupplementalViewQueryContext::Scte35(Scte35Context {
+                message: String::from(SCTE35_IN_MESSAGE),
+                daterange_id: String::from("0x20-3-1755721822"),
+                command_type: Scte35CommandType::In
+            }),
+            encoded: "SCTE35,IN,0x20-3-1755721822%22{SCTE35_IN_MESSAGE}",
+            decoded: "SCTE35,IN,0x20-3-1755721822\"{SCTE35_IN_MESSAGE}"
+        );
+    }
+
+    #[test]
+    fn encode_scte35_should_encode_and_percent_encode_id() {
+        assert_codec_equality!(
+            input: SupplementalViewQueryContext::Scte35(Scte35Context {
+                message: String::from(SCTE35_IN_MESSAGE),
+                daterange_id: String::from("test=true"),
+                command_type: Scte35CommandType::Cmd
+            }),
+            encoded: "SCTE35,CMD,test%3Dtrue%22{SCTE35_IN_MESSAGE}",
+            decoded: "SCTE35,CMD,test=true\"{SCTE35_IN_MESSAGE}"
+        );
+    }
+
+    #[test]
     fn encode_decode_definitions_for_single_definition() {
         let query_value = String::from("hello%3Dworld");
         let definitions = definitions_from([("hello", "world")]);
@@ -519,4 +648,13 @@ mod tests {
         }
         map
     }
+
+    const SCTE35_OUT_MESSAGE: &str = concat!(
+        "0xfc303e0000000000000000c00506fe702f81fa0028022643554549000000017fff0000e297d00e1270636b5",
+        "f455030343435303730333036393522040695798fb9",
+    );
+    const SCTE35_IN_MESSAGE: &str = concat!(
+        "0xfc30390000000000000000c00506fe702f81fa0023022143554549000000037fbf0e1270636b5f455030343",
+        "435303730333036393521040752f6e800",
+    );
 }

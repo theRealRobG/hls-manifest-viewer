@@ -5,9 +5,9 @@ mod playlist;
 mod preformatted;
 
 use crate::utils::{
-    network::{FetchError, FetchTextResponse, RequestRange, fetch_array_buffer},
+    network::{fetch_array_buffer, FetchError, FetchTextResponse, RequestRange},
     query_codec::{MediaSegmentContext, PartSegmentContext, SupplementalViewQueryContext},
-    response::{SegmentType, determine_segment_type},
+    response::{determine_segment_type, SegmentType},
 };
 use error::ViewerError;
 use isobmff::IsobmffViewer;
@@ -77,6 +77,9 @@ pub fn Viewer(
         }
     };
     match context {
+        SupplementalViewQueryContext::Scte35(scte35_context) => {
+            todo!();
+        }
         SupplementalViewQueryContext::Segment(media_segment_context) => {
             let MediaSegmentContext {
                 url,

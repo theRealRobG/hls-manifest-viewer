@@ -1,6 +1,9 @@
 use crate::utils::{
     network::RequestRange,
-    query_codec::{encode_definitions, encode_map, encode_part, encode_segment, percent_encode},
+    query_codec::{
+        encode_definitions, encode_map, encode_part, encode_scte35, encode_segment, percent_encode,
+        Scte35CommandType,
+    },
 };
 use leptos::prelude::GetUntracked;
 use leptos_router::hooks::use_query_map;
@@ -68,6 +71,20 @@ pub fn part_href(
         definitions_query_value(),
         definitions,
     )
+}
+
+pub fn scte35_href(
+    scte35_message: &str,
+    daterange_id: &str,
+    command_type: Scte35CommandType,
+) -> Option<String> {
+    Some(media_scte35_href(
+        base_url()?,
+        definitions_query_value(),
+        scte35_message,
+        daterange_id,
+        command_type,
+    ))
 }
 
 // These functions can't be run in tests because `use_query_map` must be run from within a Leptos
@@ -141,6 +158,36 @@ fn media_segment_href(
             SUPPLEMENTAL_VIEW_QUERY_NAME,
             encoded_supplemental_context,
         ))
+    }
+}
+
+fn media_scte35_href(
+    base_url: Url,
+    definitions_query_value: Option<String>,
+    scte35_message: &str,
+    daterange_id: &str,
+    command_type: Scte35CommandType,
+) -> String {
+    let query_encoded_base_url = percent_encode(base_url.as_str());
+    let encoded_supplemental_context = encode_scte35(scte35_message, daterange_id, command_type);
+    if let Some(definitions) = definitions_query_value {
+        format!(
+            "?{}={}&{}={}&{}={}",
+            PLAYLIST_URL_QUERY_NAME,
+            query_encoded_base_url,
+            DEFINITIONS_QUERY_NAME,
+            definitions,
+            SUPPLEMENTAL_VIEW_QUERY_NAME,
+            encoded_supplemental_context,
+        )
+    } else {
+        format!(
+            "?{}={}&{}={}",
+            PLAYLIST_URL_QUERY_NAME,
+            query_encoded_base_url,
+            SUPPLEMENTAL_VIEW_QUERY_NAME,
+            encoded_supplemental_context,
+        )
     }
 }
 
@@ -458,4 +505,54 @@ mod tests {
             )
         );
     }
+
+    #[test]
+    fn scte35_href_when_no_definitions_query_works_as_expected() {
+        let base_url = "https://example.com/hls/hi/media.m3u8";
+        assert_eq!(
+            format!(
+                "?{}={}&{}={}",
+                PLAYLIST_URL_QUERY_NAME,
+                base_url,
+                SUPPLEMENTAL_VIEW_QUERY_NAME,
+                format!("SCTE35,OUT,0x22-1-1755722246%22{SCTE35_OUT_MESSAGE}"),
+            ),
+            media_scte35_href(
+                Url::parse(base_url).unwrap(),
+                None,
+                SCTE35_OUT_MESSAGE,
+                "0x22-1-1755722246",
+                Scte35CommandType::Out,
+            )
+        );
+    }
+
+    #[test]
+    fn scte35_href_when_some_definitions_query_works_as_expected() {
+        let base_url = "https://example.com/hls/hi/media.m3u8";
+        let definitions = String::from("test%3Dtrue");
+        assert_eq!(
+            format!(
+                "?{}={}&{}={}&{}={}",
+                PLAYLIST_URL_QUERY_NAME,
+                base_url,
+                DEFINITIONS_QUERY_NAME,
+                definitions,
+                SUPPLEMENTAL_VIEW_QUERY_NAME,
+                format!("SCTE35,CMD,%26id%3D123%22{SCTE35_OUT_MESSAGE}"),
+            ),
+            media_scte35_href(
+                Url::parse(base_url).unwrap(),
+                Some(definitions),
+                SCTE35_OUT_MESSAGE,
+                "&id=123",
+                Scte35CommandType::Cmd,
+            )
+        );
+    }
+
+    const SCTE35_OUT_MESSAGE: &str = concat!(
+        "0xfc303e0000000000000000c00506fe702f81fa0028022643554549000000017fff0000e297d00e1270636b5",
+        "f455030343435303730333036393522040695798fb9",
+    );
 }
