@@ -49,15 +49,15 @@ pub fn Scte35Viewer(context: Scte35Context) -> impl IntoView {
         }),
         Err(e) => {
             let (error, extra_info) = match e {
-                DecodeMessageError::HexError(e) => (
+                DecodeMessageError::Hex(e) => (
                     String::from("Error reading hex string"),
                     Some(format!("{e}")),
                 ),
-                DecodeMessageError::Scte35Error(e) => (
+                DecodeMessageError::Scte35(e) => (
                     String::from("Error parsing SCTE35 data"),
                     Some(format!("{e}")),
                 ),
-                DecodeMessageError::JsonError(e) => (
+                DecodeMessageError::Json(e) => (
                     String::from("Error converting to JSON"),
                     Some(format!("{e}")),
                 ),
@@ -97,33 +97,33 @@ fn decode_hex(s: &str) -> Result<Vec<u8>, DecodeHexError> {
 
 #[derive(Debug)]
 enum DecodeMessageError {
-    HexError(DecodeHexError),
-    Scte35Error(io::Error),
-    JsonError(serde_json::Error),
+    Hex(DecodeHexError),
+    Scte35(io::Error),
+    Json(serde_json::Error),
 }
 impl Display for DecodeMessageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DecodeMessageError::HexError(e) => e.fmt(f),
-            DecodeMessageError::Scte35Error(e) => e.fmt(f),
-            DecodeMessageError::JsonError(e) => e.fmt(f),
+            DecodeMessageError::Hex(e) => e.fmt(f),
+            DecodeMessageError::Scte35(e) => e.fmt(f),
+            DecodeMessageError::Json(e) => e.fmt(f),
         }
     }
 }
 impl Error for DecodeMessageError {}
 impl From<DecodeHexError> for DecodeMessageError {
     fn from(value: DecodeHexError) -> Self {
-        Self::HexError(value)
+        Self::Hex(value)
     }
 }
 impl From<io::Error> for DecodeMessageError {
     fn from(value: io::Error) -> Self {
-        Self::Scte35Error(value)
+        Self::Scte35(value)
     }
 }
 impl From<serde_json::Error> for DecodeMessageError {
     fn from(value: serde_json::Error) -> Self {
-        Self::JsonError(value)
+        Self::Json(value)
     }
 }
 
