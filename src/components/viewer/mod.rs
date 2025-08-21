@@ -3,11 +3,15 @@ mod isobmff;
 mod loading;
 mod playlist;
 mod preformatted;
+mod scte35;
 
-use crate::utils::{
-    network::{FetchError, FetchTextResponse, RequestRange, fetch_array_buffer},
-    query_codec::{MediaSegmentContext, PartSegmentContext, SupplementalViewQueryContext},
-    response::{SegmentType, determine_segment_type},
+use crate::{
+    components::viewer::playlist::HighlightedScte35Info,
+    utils::{
+        network::{fetch_array_buffer, FetchError, FetchTextResponse, RequestRange},
+        query_codec::{MediaSegmentContext, PartSegmentContext, SupplementalViewQueryContext},
+        response::{determine_segment_type, SegmentType},
+    },
 };
 use error::ViewerError;
 use isobmff::IsobmffViewer;
@@ -15,6 +19,7 @@ use leptos::prelude::*;
 pub use loading::ViewerLoading;
 use playlist::{HighlightedMapInfo, HighlightedPartInfo, PlaylistViewer};
 use preformatted::PreformattedViewer;
+use scte35::Scte35Viewer;
 use std::collections::HashMap;
 
 const VIEWER_CLASS: &str = "viewer-content";
@@ -29,6 +34,9 @@ const COMMENT_CLASS: &str = "hls-line comment";
 const BLANK_CLASS: &str = "hls-line blank";
 const HIGHLIGHTED: &str = "highlighted";
 const HIGHLIGHTED_URI_CLASS: &str = "hls-line uri highlighted";
+const UNDERLINED: &str = "underlined";
+const LINE_BREAK_ANYWHERE: &str = "line-break-anywhere";
+const LINE_BREAK_WORD: &str = "line-break-word";
 
 #[component]
 pub fn Viewer(
@@ -77,6 +85,25 @@ pub fn Viewer(
         }
     };
     match context {
+        SupplementalViewQueryContext::Scte35(scte35_context) => {
+            let highlighted_info = HighlightedScte35Info {
+                daterange_id: scte35_context.daterange_id.clone(),
+                command_type: scte35_context.command_type,
+            };
+            view! {
+                <Container>
+                    <ErrorBounded>
+                        <PlaylistViewer
+                            playlist
+                            imported_definitions
+                            supplemental_showing=true
+                            highlighted_scte35_info=highlighted_info
+                        />
+                    </ErrorBounded>
+                    <Scte35Viewer context=scte35_context />
+                </Container>
+            }
+        }
         SupplementalViewQueryContext::Segment(media_segment_context) => {
             let MediaSegmentContext {
                 url,

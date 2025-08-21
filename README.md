@@ -30,7 +30,7 @@ interface that can be loaded in your web browser. Here are some of the goals of 
     - [ ] Packed Audio
     - [x] WebVTT
     - [ ] IMSC Subtitles
-- [ ] Provide a view for parsing SCTE35 messages found in `EXT-X-DATERANGE` tags.
+- [x] Provide a view for parsing SCTE35 messages found in `EXT-X-DATERANGE` tags.
 - [ ] Provide a view for visualizing what range of segments a given `EXT-X-DATERANGE` tag applies to
       (given that `EXT-X-DATERANGE` is described using [ISO_8601][10] and can appear anywhere in the
       playlist it isn't always easy to see if a segment is included in the range or not).
@@ -38,7 +38,7 @@ interface that can be loaded in your web browser. Here are some of the goals of 
       [X-ASSET-LIST][12] attribute in HLS Interstitials, [EXT-X-SESSION-DATA][13], etc.).
 
 So far only media playlist resolution, fMP4 (including range requests based on `EXT-X-BYTERANGE` /
-`EXT-X-MAP:BYTERANGE`), and WebVTT views have been implemented.
+`EXT-X-MAP:BYTERANGE`), WebVTT, and SCTE35 views have been implemented.
 
 But ultimately, this tool is just meant to be helpful in making working with HLS easier as a player
 developer, and so there may be many other fun directions to go in. For example, an MSE player view
