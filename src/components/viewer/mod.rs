@@ -4,10 +4,16 @@ mod loading;
 mod playlist;
 mod preformatted;
 
-use crate::utils::{
-    network::{fetch_array_buffer, FetchError, FetchTextResponse, RequestRange},
-    query_codec::{MediaSegmentContext, PartSegmentContext, SupplementalViewQueryContext},
-    response::{determine_segment_type, SegmentType},
+use crate::{
+    components::viewer::playlist::HighlightedScte35Info,
+    utils::{
+        network::{fetch_array_buffer, FetchError, FetchTextResponse, RequestRange},
+        query_codec::{
+            MediaSegmentContext, PartSegmentContext, Scte35CommandType, Scte35Context,
+            SupplementalViewQueryContext,
+        },
+        response::{determine_segment_type, SegmentType},
+    },
 };
 use error::ViewerError;
 use isobmff::IsobmffViewer;
@@ -29,6 +35,10 @@ const COMMENT_CLASS: &str = "hls-line comment";
 const BLANK_CLASS: &str = "hls-line blank";
 const HIGHLIGHTED: &str = "highlighted";
 const HIGHLIGHTED_URI_CLASS: &str = "hls-line uri highlighted";
+const UNDERLINED: &str = "underlined";
+const LINE_BREAK_ANYWHERE: &str = "line-break-anywhere";
+const LINE_BREAK_WORD: &str = "line-break-word";
+const SCTE35_TABLE: &str = "scte35-info-table";
 
 #[component]
 pub fn Viewer(
@@ -78,7 +88,53 @@ pub fn Viewer(
     };
     match context {
         SupplementalViewQueryContext::Scte35(scte35_context) => {
-            todo!();
+            let Scte35Context {
+                message,
+                daterange_id,
+                command_type,
+            } = scte35_context;
+            let highlighted_info = HighlightedScte35Info {
+                daterange_id: daterange_id.clone(),
+                command_type: command_type.clone(),
+            };
+            view! {
+                <Container>
+                    <ErrorBounded>
+                        <PlaylistViewer
+                            playlist
+                            imported_definitions
+                            supplemental_showing=true
+                            highlighted_scte35_info=highlighted_info
+                        />
+                    </ErrorBounded>
+                    <div class=SUPPLEMENTAL_VIEW_CLASS>
+                        <table class=SCTE35_TABLE>
+                            <tr>
+                                <td class=LINE_BREAK_WORD>"ID"</td>
+                                <td>{daterange_id}</td>
+                            </tr>
+                            <tr>
+                                <td class=LINE_BREAK_WORD>"Type"</td>
+                                <td>
+                                    {match command_type {
+                                        Scte35CommandType::Out => "SCTE35-OUT",
+                                        Scte35CommandType::In => "SCTE35-IN",
+                                        Scte35CommandType::Cmd => "SCTE35-CMD",
+                                    }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class=LINE_BREAK_WORD>"Message"</td>
+                                <td class=LINE_BREAK_ANYWHERE>
+                                    <code>{message}</code>
+                                </td>
+                            </tr>
+                        </table>
+                        <p class=UNDERLINED>"Decoded"</p>
+                        <pre>"TODO"</pre>
+                    </div>
+                </Container>
+            }
         }
         SupplementalViewQueryContext::Segment(media_segment_context) => {
             let MediaSegmentContext {
