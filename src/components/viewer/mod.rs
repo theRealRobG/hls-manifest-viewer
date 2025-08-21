@@ -3,15 +3,13 @@ mod isobmff;
 mod loading;
 mod playlist;
 mod preformatted;
+mod scte35;
 
 use crate::{
     components::viewer::playlist::HighlightedScte35Info,
     utils::{
         network::{fetch_array_buffer, FetchError, FetchTextResponse, RequestRange},
-        query_codec::{
-            MediaSegmentContext, PartSegmentContext, Scte35CommandType, Scte35Context,
-            SupplementalViewQueryContext,
-        },
+        query_codec::{MediaSegmentContext, PartSegmentContext, SupplementalViewQueryContext},
         response::{determine_segment_type, SegmentType},
     },
 };
@@ -21,6 +19,7 @@ use leptos::prelude::*;
 pub use loading::ViewerLoading;
 use playlist::{HighlightedMapInfo, HighlightedPartInfo, PlaylistViewer};
 use preformatted::PreformattedViewer;
+use scte35::Scte35Viewer;
 use std::collections::HashMap;
 
 const VIEWER_CLASS: &str = "viewer-content";
@@ -38,7 +37,6 @@ const HIGHLIGHTED_URI_CLASS: &str = "hls-line uri highlighted";
 const UNDERLINED: &str = "underlined";
 const LINE_BREAK_ANYWHERE: &str = "line-break-anywhere";
 const LINE_BREAK_WORD: &str = "line-break-word";
-const SCTE35_TABLE: &str = "scte35-info-table";
 
 #[component]
 pub fn Viewer(
@@ -88,14 +86,9 @@ pub fn Viewer(
     };
     match context {
         SupplementalViewQueryContext::Scte35(scte35_context) => {
-            let Scte35Context {
-                message,
-                daterange_id,
-                command_type,
-            } = scte35_context;
             let highlighted_info = HighlightedScte35Info {
-                daterange_id: daterange_id.clone(),
-                command_type: command_type.clone(),
+                daterange_id: scte35_context.daterange_id.clone(),
+                command_type: scte35_context.command_type,
             };
             view! {
                 <Container>
@@ -107,32 +100,7 @@ pub fn Viewer(
                             highlighted_scte35_info=highlighted_info
                         />
                     </ErrorBounded>
-                    <div class=SUPPLEMENTAL_VIEW_CLASS>
-                        <table class=SCTE35_TABLE>
-                            <tr>
-                                <td class=LINE_BREAK_WORD>"ID"</td>
-                                <td>{daterange_id}</td>
-                            </tr>
-                            <tr>
-                                <td class=LINE_BREAK_WORD>"Type"</td>
-                                <td>
-                                    {match command_type {
-                                        Scte35CommandType::Out => "SCTE35-OUT",
-                                        Scte35CommandType::In => "SCTE35-IN",
-                                        Scte35CommandType::Cmd => "SCTE35-CMD",
-                                    }}
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class=LINE_BREAK_WORD>"Message"</td>
-                                <td class=LINE_BREAK_ANYWHERE>
-                                    <code>{message}</code>
-                                </td>
-                            </tr>
-                        </table>
-                        <p class=UNDERLINED>"Decoded"</p>
-                        <pre>"TODO"</pre>
-                    </div>
+                    <Scte35Viewer context=scte35_context />
                 </Container>
             }
         }
