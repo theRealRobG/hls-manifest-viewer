@@ -19,6 +19,12 @@ pub fn App() -> impl IntoView {
         <Meta charset="UTF-8" />
         <Meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <Title text="HLS Manifest Viewer" />
+        <Link rel="icon" href="/hls-manifest-viewer/quick-m3u8-logo.ico" attr::type="image/ico" />
+        <Link
+            rel="mask-icon"
+            href="/hls-manifest-viewer/quick-m3u8-logo.ico"
+            attr::color="#000000"
+        />
 
         <Router>
             <nav>
