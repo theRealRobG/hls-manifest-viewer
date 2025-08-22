@@ -7,7 +7,7 @@ mod components;
 mod pages;
 mod utils;
 // Pages
-use crate::pages::{about::About, home::Home, not_found::NotFound};
+use crate::pages::{about::About, examples::Examples, home::Home, not_found::NotFound};
 
 /// An app router which renders the homepage and handles 404's
 #[component]
@@ -31,6 +31,9 @@ pub fn App() -> impl IntoView {
                 <a class="button" href="/hls-manifest-viewer">
                     "Home"
                 </a>
+                <a class="button" href="/hls-manifest-viewer/examples">
+                    "Examples"
+                </a>
                 <a class="button" href="/hls-manifest-viewer/about">
                     "About"
                 </a>
@@ -45,6 +48,7 @@ pub fn App() -> impl IntoView {
             <main>
                 <Routes fallback=NotFound>
                     <Route path=path!("/hls-manifest-viewer") view=Home />
+                    <Route path=path!("/hls-manifest-viewer/examples") view=Examples />
                     <Route path=path!("/hls-manifest-viewer/about") view=About />
                 </Routes>
             </main>

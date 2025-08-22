@@ -37,6 +37,8 @@
       --color-sky-800: oklch(44.3% 0.11 240.79);
       --color-sky-900: oklch(39.1% 0.09 240.876);
       --color-sky-950: oklch(29.3% 0.066 243.157);
+      --color-violet-300: oklch(81.1% 0.111 293.571);
+      --color-violet-500: oklch(60.6% 0.25 292.717);
       --color-stone-600: oklch(44.4% 0.011 73.639);
       --color-stone-800: oklch(26.8% 0.007 34.298);
       --color-stone-900: oklch(21.6% 0.006 56.043);
@@ -45,6 +47,7 @@
       --container-3xl: 48rem;
       --text-sm: 0.875rem;
       --text-sm--line-height: calc(1.25 / 0.875);
+      --text-3xl: 1.875rem;
       --text-5xl: 3rem;
       --font-weight-bold: 700;
       --leading-tight: 1.25;
@@ -96,6 +99,19 @@
       }
     }
 
+    h2 {
+      display: block;
+      box-sizing: border-box;
+      font-size: var(--text-3xl);
+      line-height: var(--leading-loose);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-sky-500);
+
+      @media (prefers-color-scheme: dark) {
+        color: var(--color-sky-300);
+      }
+    }
+
     .body-content {
       max-width: var(--container-3xl);
       margin-inline: auto;
@@ -110,10 +126,34 @@
       }
     }
 
+    .body-link {
+      color: var(--color-sky-500);
+
+      @media (prefers-color-scheme: dark) {
+        color: var(--color-sky-300);
+      }
+    }
+
+    .body-link:visited {
+      color: var(--color-violet-500);
+
+      @media (prefers-color-scheme: dark) {
+        color: var(--color-violet-300);
+      }
+    }
+
     .body-list {
       list-style-position: inside;
       list-style-type: decimal;
       padding: calc(var(--spacing) * 2);
+    }
+
+    .unordered-list {
+      list-style-type: disc;
+    }
+
+    .centered {
+      text-align: center;
     }
 
     .button {
@@ -171,6 +211,23 @@
     nav .button img,
     nav .button svg {
       height: var(--text-sm);
+    }
+
+    /* Styling for examples page */
+    .examples-table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    .examples-table,
+    .examples-table th,
+    .examples-table td {
+      border: 1px solid var(--color-stone-600);
+      padding: var(--spacing);
+    }
+
+    .examples-table td:first-child {
+      width: 100%;
     }
 
     /* Styling for the HLS playlist viewer */
