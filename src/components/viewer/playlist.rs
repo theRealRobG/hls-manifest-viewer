@@ -190,7 +190,6 @@ fn uri_line(uri: &str, state: &mut ParsingState) {
         UriType::Playlist
     };
     let byterange = state.segment_byterange;
-    state.segment_byterange = None;
     state.lines.push(
         view! {
             <a
