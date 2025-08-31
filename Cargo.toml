@@ -22,7 +22,7 @@ wasm-bindgen-futures = "0.4"
 url = "2.5"
 percent-encoding = "2.3"
 leptos-use = { version = "0.16", features = ["use_clipboard"] }
-mp4-atom = "0.8.1"
+mp4-atom = { git = "https://github.com/kixelated/mp4-atom.git", rev = "2c5be9d1d391a0be30c372a61688f8ee24e1659d" }
 id3 = "1.16"
 console_log = "1"
 log = "0.4"
