@@ -1,4 +1,6 @@
-use mp4_atom::{Any, Atom, Audio, Buf, Decode, DecodeAtom, FourCC, Header, Visual};
+use mp4_atom::{
+    Any, AnySampleGroupEntry, Atom, Audio, Buf, Decode, DecodeAtom, FourCC, Header, Visual,
+};
 use std::{fmt::Display, io::Cursor};
 
 use crate::utils::mp4::Prft;
@@ -194,6 +196,7 @@ pub struct TablePropertyValue {
 }
 
 pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
+    #[deny(clippy::wildcard_enum_match_arm)]
     match atom {
         Any::Ftyp(ftyp) => AtomProperties {
             box_name: "FileTypeBox",
@@ -1200,6 +1203,114 @@ pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
                 ),
             )],
         },
+        Any::Sbgp(sbgp) => AtomProperties {
+            box_name: "SampleToGroupBox",
+            properties: vec![
+                ("grouping_type", AtomPropertyValue::from(sbgp.grouping_type)),
+                (
+                    "grouping_type_parameter",
+                    AtomPropertyValue::from(sbgp.grouping_type_parameter),
+                ),
+                (
+                    "entries",
+                    AtomPropertyValue::Table(TablePropertyValue {
+                        headers: Some(vec!["sample_count", "group_description_index"]),
+                        rows: sbgp
+                            .entries
+                            .iter()
+                            .map(|entry| {
+                                vec![
+                                    BasicPropertyValue::from(entry.sample_count),
+                                    BasicPropertyValue::from(entry.group_description_index),
+                                ]
+                            })
+                            .collect(),
+                    }),
+                ),
+            ],
+        },
+        Any::Sgpd(sgpd) => AtomProperties {
+            box_name: "SampleGroupDescriptionBox",
+            properties: vec![
+                ("grouping_type", AtomPropertyValue::from(sgpd.grouping_type)),
+                (
+                    "default_length",
+                    AtomPropertyValue::from(sgpd.default_length),
+                ),
+                (
+                    "default_group_description_index",
+                    AtomPropertyValue::from(sgpd.default_group_description_index),
+                ),
+                (
+                    "static_group_description",
+                    AtomPropertyValue::from(sgpd.static_group_description),
+                ),
+                (
+                    "static_mapping",
+                    AtomPropertyValue::from(sgpd.static_mapping),
+                ),
+                ("essential", AtomPropertyValue::from(sgpd.essential)),
+                (
+                    "entries",
+                    AtomPropertyValue::Table(TablePropertyValue {
+                        headers: Some(vec!["description_length", "4CC", "data"]),
+                        rows: sgpd
+                            .entries
+                            .iter()
+                            .map(|entry| match &entry.entry {
+                                AnySampleGroupEntry::UnknownGroupingType(four_cc, items) => vec![
+                                    BasicPropertyValue::from(entry.description_length),
+                                    BasicPropertyValue::from(*four_cc),
+                                    BasicPropertyValue::Hex(items.clone()),
+                                ],
+                            })
+                            .collect(),
+                    }),
+                ),
+            ],
+        },
+        Any::Subs(subs) => AtomProperties {
+            box_name: "SubSampleInformationBox",
+            properties: vec![
+                (
+                    "flags",
+                    AtomPropertyValue::from(BasicPropertyValue::Hex(subs.flags.to_vec())),
+                ),
+                (
+                    "entries",
+                    AtomPropertyValue::Table(TablePropertyValue {
+                        headers: Some(vec![
+                            "sample_delta",
+                            "size",
+                            "priority",
+                            "discardable",
+                            "params",
+                        ]),
+                        rows: subs
+                            .entries
+                            .iter()
+                            .map(|entry| {
+                                entry
+                                    .subsamples
+                                    .iter()
+                                    .flat_map(|subsample| {
+                                        vec![
+                                            BasicPropertyValue::from(entry.sample_delta),
+                                            BasicPropertyValue::from(subsample.size.value()),
+                                            BasicPropertyValue::from(subsample.priority),
+                                            BasicPropertyValue::from(subsample.discardable),
+                                            BasicPropertyValue::Hex(
+                                                subsample.codec_specific_parameters.clone(),
+                                            ),
+                                        ]
+                                    })
+                                    .collect()
+                            })
+                            .collect(),
+                    }),
+                ),
+            ],
+        },
         Any::Saio(saio) => AtomProperties {
             box_name: "SampleAuxiliaryInformationOffsetsBox",
             properties: vec![
@@ -1491,7 +1602,7 @@ pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
         Any::Moof(_) => unimplemented!(), // MovieFragmentBox
         Any::Traf(_) => unimplemented!(), // TrackFragmentBox
         Any::Mdat(_) => unimplemented!(), // MediaDataBox
-        _ => todo!(),
+        unknown => todo!("missing props for {unknown:?}"),
     }
 }
 

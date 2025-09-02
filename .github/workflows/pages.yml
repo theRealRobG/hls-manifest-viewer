@@ -26,6 +26,8 @@ jobs:
       run: rustup target add wasm32-unknown-unknown
     - name: Run tests
       run: cargo test --verbose
+    - name: Run clippy
+      run: cargo clippy -- -D warnings
     - name: Install trunk
       run: cargo install trunk
     - name: Build with trunk
