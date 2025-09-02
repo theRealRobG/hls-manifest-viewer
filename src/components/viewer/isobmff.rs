@@ -1,7 +1,7 @@
 use crate::{
     components::viewer::ISOBMFF_VIEW_CLASS,
     utils::mp4_atom_properties::{
-        AtomProperties, AtomPropertyValue, TablePropertyValue, get_properties,
+        get_properties, AtomProperties, AtomPropertyValue, BasicPropertyValue, TablePropertyValue,
     },
 };
 use leptos::{
@@ -135,7 +135,7 @@ fn AtomInfo(properties: AtomProperties) -> impl IntoView {
                             <td>{*key}</td>
                             <td>
                                 {match value {
-                                    AtomPropertyValue::Basic(v) => Either::Left(String::from(v)),
+                                    AtomPropertyValue::Basic(v) => Either::Left(view_from_prop(v)),
                                     AtomPropertyValue::Table(v) => {
                                         Either::Right(view! { <InnerTable properties=v.clone() /> })
                                     }
@@ -165,7 +165,7 @@ fn InnerTable(properties: TablePropertyValue) -> impl IntoView {
                             <tr>
                                 {row
                                     .iter()
-                                    .map(|col| view! { <td>{String::from(col)}</td> })
+                                    .map(|col| view! { <td>{view_from_prop(col)}</td> })
                                     .collect_view()}
                             </tr>
                         }
@@ -184,7 +184,7 @@ fn InnerTable(properties: TablePropertyValue) -> impl IntoView {
                             <tr>
                                 {row
                                     .iter()
-                                    .map(|col| view! { <td>{String::from(col)}</td> })
+                                    .map(|col| view! { <td>{view_from_prop(col)}</td> })
                                     .collect_view()}
                             </tr>
                         }
@@ -192,5 +192,18 @@ fn InnerTable(properties: TablePropertyValue) -> impl IntoView {
                     .collect_view()}
             </table>
         })
+    }
+}
+
+// Naming the type, rather than using impl IntoView, helps the borrow checker calm down when passing
+// the property by reference in the map closures.
+fn view_from_prop(
+    property: &BasicPropertyValue,
+) -> Either<View<leptos::html::HtmlElement<leptos::html::Pre, (), (String,)>>, String> {
+    let string = String::from(property);
+    if property.is_hex() {
+        Either::Left(view! { <pre>{string}</pre> })
+    } else {
+        Either::Right(view! { {string} })
     }
 }

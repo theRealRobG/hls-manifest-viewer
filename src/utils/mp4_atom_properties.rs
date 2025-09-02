@@ -35,6 +35,12 @@ pub enum BasicPropertyValue {
     I8(i8),
     Usize(usize),
     Bool(bool),
+    Hex(Vec<u8>),
+}
+impl BasicPropertyValue {
+    pub fn is_hex(&self) -> bool {
+        matches!(self, Self::Hex(_))
+    }
 }
 impl From<&BasicPropertyValue> for String {
     fn from(value: &BasicPropertyValue) -> Self {
@@ -49,6 +55,32 @@ impl From<&BasicPropertyValue> for String {
             BasicPropertyValue::I8(i) => format!("{i}"),
             BasicPropertyValue::Usize(u) => format!("{u}"),
             BasicPropertyValue::Bool(b) => format!("{b}"),
+            BasicPropertyValue::Hex(bytes) => {
+                // Rows of hex - 16 columns to a row
+                let mut rows = Vec::new();
+                // Columns of hex - 4 sections to a column
+                let mut columns = Vec::new();
+                // Sections of hex - 4 bytes to a section
+                let mut sections = Vec::new();
+                for byte in bytes {
+                    sections.push(format!("{byte:02X}"));
+                    if sections.len() == 4 {
+                        columns.push(sections.join(" "));
+                        sections.clear();
+                        if columns.len() == 4 {
+                            rows.push(columns.join("  "));
+                            columns.clear();
+                        }
+                    }
+                }
+                if !sections.is_empty() {
+                    columns.push(sections.join(" "));
+                }
+                if !columns.is_empty() {
+                    rows.push(columns.join("  "));
+                }
+                rows.join("\n")
+            }
         }
     }
 }
@@ -793,13 +825,8 @@ pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
                                 vec![
                                     BasicPropertyValue::from(array.completeness),
                                     BasicPropertyValue::from(array.nal_unit_type),
-                                    BasicPropertyValue::from(
-                                        array
-                                            .nalus
-                                            .iter()
-                                            .map(|nalu| byte_array_string_from(nalu))
-                                            .collect::<Vec<String>>()
-                                            .join(", "),
+                                    byte_array_from(
+                                        &array.nalus.iter().flatten().copied().collect::<Vec<u8>>(),
                                     ),
                                 ]
                             })
@@ -920,9 +947,7 @@ pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
                 ),
                 (
                     "codec_initialization_data",
-                    AtomPropertyValue::from(byte_array_string_from(
-                        &vpc_c.codec_initialization_data,
-                    )),
+                    AtomPropertyValue::from(byte_array_from(&vpc_c.codec_initialization_data)),
                 ),
             ],
         },
@@ -956,7 +981,7 @@ pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
                 ),
                 (
                     "config_obus",
-                    AtomPropertyValue::from(byte_array_string_from(&av1c.config_obus)),
+                    AtomPropertyValue::from(byte_array_from(&av1c.config_obus)),
                 ),
             ],
         },
@@ -1691,15 +1716,7 @@ fn audio_entry(
 }
 
 fn byte_array_from(bytes: &[u8]) -> BasicPropertyValue {
-    BasicPropertyValue::from(byte_array_string_from(bytes))
-}
-
-fn byte_array_string_from(bytes: &[u8]) -> String {
-    bytes
-        .iter()
-        .map(|byte| format!("{byte:#04x}"))
-        .collect::<Vec<String>>()
-        .join(" ")
+    BasicPropertyValue::Hex(bytes.to_vec())
 }
 
 fn array_string_from<T: Display>(items: &[T]) -> String {
