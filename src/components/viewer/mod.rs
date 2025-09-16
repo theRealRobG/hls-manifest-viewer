@@ -27,6 +27,7 @@ const MAIN_VIEW_CLASS: &str = "viewer-main";
 const SUPPLEMENTAL_VIEW_CLASS: &str = "viewer-supplemental supplemental-active";
 const ISOBMFF_VIEW_CLASS: &str = "viewer-supplemental isobmff-view supplemental-active";
 const MAIN_VIEW_WITH_SUPPLEMENTAL_CLASS: &str = "viewer-main supplemental-active";
+const ERROR_CONTAINER_CLASS: &str = "error-container";
 const ERROR_CLASS: &str = "error";
 const TAG_CLASS: &str = "hls-line tag";
 const URI_CLASS: &str = "hls-line uri";

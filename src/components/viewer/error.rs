@@ -1,5 +1,5 @@
-use super::ERROR_CLASS;
-use leptos::prelude::*;
+use super::{ERROR_CLASS, ERROR_CONTAINER_CLASS};
+use leptos::{either::Either, prelude::*};
 
 #[component]
 pub fn ViewerError(
@@ -11,13 +11,22 @@ pub fn ViewerError(
             let error = error.to_owned();
             let extra_info = extra_info.to_owned();
             if let Some(extra_info) = extra_info {
-                view! {
-                    <p class=ERROR_CLASS>{error}</p>
-                    <pre class=ERROR_CLASS>{extra_info}</pre>
-                }
-                    .into_any()
+                Either::Left(
+                    view! {
+                        <div class=ERROR_CONTAINER_CLASS>
+                            <p class=ERROR_CLASS>{error}</p>
+                            <pre class=ERROR_CLASS>{extra_info}</pre>
+                        </div>
+                    },
+                )
             } else {
-                view! { <p class=ERROR_CLASS>{error}</p> }.into_any()
+                Either::Right(
+                    view! {
+                        <div class=ERROR_CONTAINER_CLASS>
+                            <p class=ERROR_CLASS>{error}</p>
+                        </div>
+                    },
+                )
             }
         }}
     }
