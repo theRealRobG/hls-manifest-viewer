@@ -1,18 +1,35 @@
 use crate::utils::{
     network::RequestRange,
     query_codec::{
-        encode_definitions, encode_map, encode_part, encode_scte35, encode_segment, percent_encode,
-        Scte35CommandType,
+        encode_definitions, encode_map, encode_part, encode_scte35, encode_segment, percent_decode,
+        percent_encode, Scte35CommandType,
     },
 };
 use leptos::prelude::GetUntracked;
-use leptos_router::hooks::use_query_map;
+use leptos_router::hooks::use_url;
 use std::{borrow::Cow, collections::HashMap};
 use url::Url;
 
 pub const PLAYLIST_URL_QUERY_NAME: &str = "playlist_url";
 pub const SUPPLEMENTAL_VIEW_QUERY_NAME: &str = "supplemental_view_context";
 pub const DEFINITIONS_QUERY_NAME: &str = "imported_definitions";
+
+pub fn query_value_from_leptos_url<'a>(
+    url: &'a leptos_router::location::Url,
+    query_name: &'static str,
+) -> Option<Cow<'a, str>> {
+    url.search().split('&').find_map(|pair| {
+        if let Some((key, value)) = pair.split_once('=') {
+            if key == query_name {
+                Some(Cow::Borrowed(value))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    })
+}
 
 pub fn media_playlist_href(
     relative_uri: &str,
@@ -87,17 +104,17 @@ pub fn scte35_href(
     ))
 }
 
-// These functions can't be run in tests because `use_query_map` must be run from within a Leptos
-// `Router` context (tests crash otherwise). Therefore, the bulk of the logic is extracted to below
-// so that it is testable.
+// These functions can't be run in tests because `use_url` must be run from within a Leptos `Router`
+// context (tests crash otherwise). Therefore, the bulk of the logic is extracted to below so that
+// it is testable.
 fn base_url() -> Option<Url> {
-    let base_url_query_parameter = use_query_map()
-        .get_untracked()
-        .get(PLAYLIST_URL_QUERY_NAME)?;
-    Url::parse(&base_url_query_parameter).ok()
+    let url = use_url().get_untracked();
+    let base_url_query_parameter = query_value_from_leptos_url(&url, PLAYLIST_URL_QUERY_NAME)?;
+    Url::parse(&percent_decode(&base_url_query_parameter)).ok()
 }
 fn definitions_query_value() -> Option<String> {
-    use_query_map().get_untracked().get(DEFINITIONS_QUERY_NAME)
+    let url = use_url().get_untracked();
+    query_value_from_leptos_url(&url, DEFINITIONS_QUERY_NAME).map(|cow| cow.to_string())
 }
 
 fn playlist_href(
@@ -363,7 +380,7 @@ mod tests {
             .next()
             .expect("definitions query value should be defined");
         assert_definitions_string_equality(
-            "DOMAIN%3Dhttps://cdn.com%22TOKEN%3D1234",
+            "DOMAIN%253Dhttps://cdn.com%22TOKEN%253D1234",
             definitions_query_value,
         );
     }

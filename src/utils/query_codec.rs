@@ -132,7 +132,7 @@ pub fn encode_definitions(definitions: &HashMap<String, String>) -> String {
     percent_encode(
         &definitions
             .iter()
-            .map(|(key, value)| format!("{key}={value}"))
+            .map(|(key, value)| percent_encode(&format!("{key}={value}")).to_string())
             .collect::<Vec<String>>()
             .join(SPECIAL_SEPARATOR),
     )
@@ -148,6 +148,7 @@ pub fn decode_definitions(
     let split = percent_decoded.split(SPECIAL_SEPARATOR);
     let mut map = HashMap::new();
     for key_value in split {
+        let key_value = percent_decode(key_value);
         let mut key_value_split = key_value.splitn(2, '=');
         let Some(key) = key_value_split.next() else {
             return Err(DecodeDefinitionsError::MalformedDefinitionMissingName);
@@ -179,6 +180,10 @@ const QUERY: &AsciiSet = &CONTROLS
 
 pub fn percent_encode(value: &str) -> Cow<'_, str> {
     Cow::from(utf8_percent_encode(value, QUERY))
+}
+
+pub fn percent_decode(value: &str) -> Cow<'_, str> {
+    percent_encoding::percent_decode_str(value).decode_utf8_lossy()
 }
 
 impl TryFrom<&str> for SupplementalViewQueryContext {
@@ -604,7 +609,7 @@ mod tests {
 
     #[test]
     fn encode_decode_definitions_for_single_definition() {
-        let query_value = String::from("hello%3Dworld");
+        let query_value = String::from("hello%253Dworld");
         let definitions = definitions_from([("hello", "world")]);
         assert_definitions_string_equality(
             query_value.as_str(),
@@ -615,7 +620,7 @@ mod tests {
 
     #[test]
     fn encode_decode_definitions_for_multiple_definitions() {
-        let query_value = String::from("hello%3Dworld%22meaning%3D42%22question%3Dunknown");
+        let query_value = String::from("hello%253Dworld%22meaning%253D42%22question%253Dunknown");
         let definitions = definitions_from([
             ("hello", "world"),
             ("meaning", "42"),
@@ -630,7 +635,10 @@ mod tests {
 
     #[test]
     fn encode_decode_definitions_with_some_characters_not_allowed_in_query() {
-        let query_value = String::from("first%3D%23%20%3Cwow%3E%26%3Cnow%3E%22next%3D%3C%3D%3E");
+        // Only %22 (`"`) is not double-encoded
+        let query_value = String::from(
+            "first%253D%2523%2520%253Cwow%253E%2526%253Cnow%253E%22next%253D%253C%253D%253E",
+        );
         let definitions = definitions_from([("first", "# <wow>&<now>"), ("next", "<=>")]);
         assert_definitions_string_equality(
             query_value.as_str(),

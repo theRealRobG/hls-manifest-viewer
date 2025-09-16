@@ -21,10 +21,16 @@ mod tests {
             vec
         });
         for expected in &expected_vec {
-            assert!(actual_vec.contains(expected));
+            assert!(
+                actual_vec.contains(expected),
+                "actual_vec {actual_vec:?} did not contain {expected}"
+            );
         }
         for actual in &actual_vec {
-            assert!(expected_vec.contains(actual));
+            assert!(
+                expected_vec.contains(actual),
+                "expected_vec {expected_vec:?} did not contain {actual}"
+            );
         }
     }
 }
