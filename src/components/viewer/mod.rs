@@ -1,3 +1,4 @@
+mod asset_list;
 mod error;
 mod isobmff;
 mod loading;

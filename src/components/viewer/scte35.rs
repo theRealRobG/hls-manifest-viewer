@@ -1,5 +1,3 @@
-use std::{error::Error, fmt::Display, io, num::ParseIntError};
-
 use super::{LINE_BREAK_ANYWHERE, LINE_BREAK_WORD, SUPPLEMENTAL_VIEW_CLASS, UNDERLINED};
 use crate::{
     components::viewer::error::ViewerError,
@@ -8,6 +6,7 @@ use crate::{
 use leptos::{either::Either, prelude::*};
 use scte35::parse_splice_info_section;
 use serde_json::to_string_pretty;
+use std::{error::Error, fmt::Display, io, num::ParseIntError};
 
 const SCTE35_TABLE: &str = "scte35-info-table";
 

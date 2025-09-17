@@ -729,6 +729,7 @@ dependencies = [
  "pretty_assertions",
  "quick-m3u8",
  "scte35",
+ "serde",
  "serde_json",
  "url",
  "wasm-bindgen",
