@@ -5,7 +5,9 @@ use super::{
 use crate::{
     components::CopyButton,
     utils::{
-        href::{map_href, media_playlist_href, part_href, scte35_href, segment_href},
+        href::{
+            asset_list_href, map_href, media_playlist_href, part_href, scte35_href, segment_href,
+        },
         network::RequestRange,
         query_codec::Scte35CommandType,
     },
@@ -31,6 +33,27 @@ macro_rules! tag_into_view {
     }};
 }
 
+pub enum Highlighted {
+    Segment {
+        media_sequence: u64,
+    },
+    Map {
+        url: String,
+        min_media_sequence: u64,
+    },
+    Part {
+        media_sequence: u64,
+        part_index: u32,
+    },
+    Scte35 {
+        daterange_id: String,
+        command_type: Scte35CommandType,
+    },
+    AssetList {
+        daterange_id: String,
+    },
+}
+
 pub struct HighlightedMapInfo {
     pub url: String,
     pub min_media_sequence: u64,
@@ -51,22 +74,12 @@ pub fn PlaylistViewer(
     playlist: String,
     imported_definitions: HashMap<String, String>,
     #[prop(default = false)] supplemental_showing: bool,
-    #[prop(optional)] highlighted_segment: Option<u64>,
-    #[prop(optional)] highlighted_map_info: Option<HighlightedMapInfo>,
-    #[prop(optional)] highlighted_part_info: Option<HighlightedPartInfo>,
-    #[prop(optional)] highlighted_scte35_info: Option<HighlightedScte35Info>,
+    #[prop(optional)] highlighted: Option<Highlighted>,
 ) -> Result<impl IntoView, PlaylistError> {
     if playlist.is_empty() {
         return Ok(EitherOf3::A(view! { <div class=MAIN_VIEW_CLASS /> }));
     }
-    match try_get_lines(
-        &playlist,
-        imported_definitions,
-        highlighted_segment,
-        highlighted_map_info,
-        highlighted_part_info,
-        highlighted_scte35_info,
-    ) {
+    match try_get_lines(&playlist, imported_definitions, highlighted) {
         Ok(lines) => {
             if supplemental_showing {
                 Ok(EitherOf3::B(view! {
@@ -106,10 +119,7 @@ impl Error for PlaylistError {}
 fn try_get_lines(
     playlist: &str,
     imported_definitions: HashMap<String, String>,
-    highlighted_segment: Option<u64>,
-    highlighted_map_info: Option<HighlightedMapInfo>,
-    highlighted_part_info: Option<HighlightedPartInfo>,
-    highlighted_scte35_info: Option<HighlightedScte35Info>,
+    highlighted: Option<Highlighted>,
 ) -> Result<Vec<AnyView>, PlaylistError> {
     let mut reader = Reader::from_str(
         playlist,
@@ -120,13 +130,7 @@ fn try_get_lines(
             .with_parsing_for_define()
             .build(),
     );
-    let mut parsing_state = ParsingState::new(
-        imported_definitions,
-        highlighted_segment,
-        highlighted_map_info,
-        highlighted_part_info,
-        highlighted_scte35_info,
-    );
+    let mut parsing_state = ParsingState::new(imported_definitions, highlighted);
 
     match reader.read_line() {
         Ok(Some(HlsLine::KnownTag(KnownTag::Hls(Tag::M3u(tag))))) => {
@@ -370,22 +374,34 @@ fn x_daterange(tag: &UnknownTag, state: &mut ParsingState) {
         });
     let markup = split_tag_as_markup(
         tag,
-        ["SCTE35-OUT", "SCTE35-IN", "SCTE35-CMD"],
-        |name, value| {
-            let command_type = match name {
-                "SCTE35-OUT" => Scte35CommandType::Out,
-                "SCTE35-IN" => Scte35CommandType::In,
-                "SCTE35-CMD" => Scte35CommandType::Cmd,
-                _ => {
-                    log::error!("unexpected SCTE35 attribute on daterange: {name}");
-                    return None;
-                }
-            };
-            id.as_ref()
-                .and_then(|id| scte35_href(value, id, command_type))
+        [
+            "SCTE35-OUT",
+            "SCTE35-IN",
+            "SCTE35-CMD",
+            "X-ASSET-URI",
+            "X-ASSET-LIST",
+        ],
+        |name, value| match name {
+            "SCTE35-OUT" => id
+                .as_ref()
+                .and_then(|id| scte35_href(value, id, Scte35CommandType::Out)),
+            "SCTE35-IN" => id
+                .as_ref()
+                .and_then(|id| scte35_href(value, id, Scte35CommandType::In)),
+            "SCTE35-CMD" => id
+                .as_ref()
+                .and_then(|id| scte35_href(value, id, Scte35CommandType::Cmd)),
+            "X-ASSET-URI" => media_playlist_href(value, &state.local_definitions),
+            "X-ASSET-LIST" => id
+                .as_ref()
+                .and_then(|id| asset_list_href(value, id, &state.local_definitions)),
+            _ => {
+                log::error!("unexpected SCTE35 attribute on daterange: {name}");
+                None
+            }
         },
         |name, _| {
-            state
+            let scte35_highlight = state
                 .highlighted_scte35_info
                 .as_ref()
                 .and_then(|info| {
@@ -401,7 +417,15 @@ fn x_daterange(tag: &UnknownTag, state: &mut ParsingState) {
                         }
                     })
                 })
-                .unwrap_or(false)
+                .unwrap_or(false);
+
+            let asset_list_highlight = state
+                .highlighted_asset_list_daterange_id
+                .as_ref()
+                .map(|highlighted_id| id.as_ref() == Some(highlighted_id))
+                .unwrap_or(false);
+
+            scte35_highlight || asset_list_highlight
         },
     );
     state.lines.push(view_from_markup(markup));
@@ -571,6 +595,7 @@ struct ParsingState {
     highlighted_map_info: Option<HighlightedMapInfo>,
     highlighted_part_info: Option<HighlightedPartInfo>,
     highlighted_scte35_info: Option<HighlightedScte35Info>,
+    highlighted_asset_list_daterange_id: Option<String>,
     // Constructed by default
     lines: Vec<AnyView>,
     media_sequence: u64,
@@ -585,17 +610,69 @@ struct ParsingState {
 impl ParsingState {
     fn new(
         imported_definitions: HashMap<String, String>,
-        highlighted_segment: Option<u64>,
-        highlighted_map_info: Option<HighlightedMapInfo>,
-        highlighted_part_info: Option<HighlightedPartInfo>,
-        highlighted_scte35_info: Option<HighlightedScte35Info>,
+        highlighted: Option<Highlighted>,
     ) -> Self {
+        let (
+            highlighted_segment,
+            highlighted_map_info,
+            highlighted_part_info,
+            highlighted_scte35_info,
+            highlighted_asset_list_daterange_id,
+        ) = match highlighted {
+            Some(Highlighted::AssetList { daterange_id }) => {
+                (None, None, None, None, Some(daterange_id))
+            }
+            Some(Highlighted::Map {
+                url,
+                min_media_sequence,
+            }) => (
+                None,
+                Some(HighlightedMapInfo {
+                    url,
+                    min_media_sequence,
+                }),
+                None,
+                None,
+                None,
+            ),
+            Some(Highlighted::Part {
+                media_sequence,
+                part_index,
+            }) => (
+                None,
+                None,
+                Some(HighlightedPartInfo {
+                    media_sequence,
+                    part_index,
+                }),
+                None,
+                None,
+            ),
+            Some(Highlighted::Scte35 {
+                daterange_id,
+                command_type,
+            }) => (
+                None,
+                None,
+                None,
+                Some(HighlightedScte35Info {
+                    daterange_id,
+                    command_type,
+                }),
+                None,
+            ),
+            Some(Highlighted::Segment { media_sequence }) => {
+                (Some(media_sequence), None, None, None, None)
+            }
+            None => (None, None, None, None, None),
+        };
         Self {
             imported_definitions,
             highlighted_segment,
             highlighted_map_info,
             highlighted_part_info,
             highlighted_scte35_info,
+            highlighted_asset_list_daterange_id,
             lines: Default::default(),
             media_sequence: Default::default(),
             part_index: Default::default(),

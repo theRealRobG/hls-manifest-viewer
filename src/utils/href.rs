@@ -1,8 +1,8 @@
 use crate::utils::{
     network::RequestRange,
     query_codec::{
-        encode_definitions, encode_map, encode_part, encode_scte35, encode_segment, percent_decode,
-        percent_encode, Scte35CommandType,
+        encode_asset_list, encode_definitions, encode_map, encode_part, encode_scte35,
+        encode_segment, percent_decode, percent_encode, Scte35CommandType,
     },
 };
 use leptos::prelude::GetUntracked;
@@ -102,6 +102,20 @@ pub fn scte35_href(
         daterange_id,
         command_type,
     ))
+}
+
+pub fn asset_list_href(
+    asset_list_uri: &str,
+    daterange_id: &str,
+    definitions: &HashMap<String, String>,
+) -> Option<String> {
+    media_asset_list_href(
+        base_url()?,
+        definitions_query_value(),
+        asset_list_uri,
+        daterange_id,
+        definitions,
+    )
 }
 
 // These functions can't be run in tests because `use_url` must be run from within a Leptos `Router`
@@ -205,6 +219,41 @@ fn media_scte35_href(
             SUPPLEMENTAL_VIEW_QUERY_NAME,
             encoded_supplemental_context,
         )
+    }
+}
+
+fn media_asset_list_href(
+    base_url: Url,
+    definitions_query_value: Option<String>,
+    asset_list_uri: &str,
+    daterange_id: &str,
+    local_definitions: &HashMap<String, String>,
+) -> Option<String> {
+    let asset_list_uri = replace_hls_variables(asset_list_uri, local_definitions);
+    let absolute_asset_list_url = base_url.join(&asset_list_uri).ok()?;
+    let query_encoded_base_url = percent_encode(base_url.as_str());
+    let asset_list_url_as_str = absolute_asset_list_url.as_str();
+    let encoded_supplemental_context = encode_asset_list(asset_list_url_as_str, daterange_id);
+    if let Some(definitions_query_value) = definitions_query_value {
+        #[allow(clippy::uninlined_format_args)] // The line is too long when inlining the variables
+        Some(format!(
+            "?{}={}&{}={}&{}={}",
+            PLAYLIST_URL_QUERY_NAME,
+            query_encoded_base_url,
+            DEFINITIONS_QUERY_NAME,
+            definitions_query_value,
+            SUPPLEMENTAL_VIEW_QUERY_NAME,
+            encoded_supplemental_context,
+        ))
+    } else {
+        #[allow(clippy::uninlined_format_args)] // The line is too long when inlining the variables
+        Some(format!(
+            "?{}={}&{}={}",
+            PLAYLIST_URL_QUERY_NAME,
+            query_encoded_base_url,
+            SUPPLEMENTAL_VIEW_QUERY_NAME,
+            encoded_supplemental_context,
+        ))
     }
 }
 
@@ -449,12 +498,30 @@ mod tests {
                 "PART,0,100,-,https://cdn.com/hi/segment-100.mp4?token%3D1234"
             )),
             media_segment_href(
-                base_url,
+                base_url.clone(),
                 uri,
                 100,
                 None,
                 SegmentType::Part { part_index: 0 },
+                Some(query_definitions.clone()),
+                &local_definitions
+            )
+        );
+        assert_eq!(
+            Some(format!(
+                "?{}={}&{}={}&{}={}",
+                PLAYLIST_URL_QUERY_NAME,
+                "https://example.com/hls/media.m3u8",
+                DEFINITIONS_QUERY_NAME,
+                "DOMAIN%3Dhttps://cdn.com",
+                SUPPLEMENTAL_VIEW_QUERY_NAME,
+                "ASSET_LIST,EXAMPLE%20ID%22https://cdn.com/hi/segment-100.mp4?token%3D1234"
+            )),
+            media_asset_list_href(
+                base_url,
                 Some(query_definitions),
+                uri,
+                "EXAMPLE ID",
                 &local_definitions
             )
         );

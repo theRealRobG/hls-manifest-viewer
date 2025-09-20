@@ -1,24 +1,22 @@
 use std::collections::HashMap;
 
-use super::{SUPPLEMENTAL_VIEW_CLASS, UNDERLINED, URI_CLASS};
+use super::{SPACER_BOTTOM, SUPPLEMENTAL_VIEW_CLASS, UNDERLINED, URI_CLASS};
 use crate::{components::viewer::error::ViewerError, utils::href::media_playlist_href};
 use leptos::{either::Either, prelude::*};
 use serde::Deserialize;
-use serde_json::to_string_pretty;
 
 #[component]
 pub fn AssetListView(json: String) -> impl IntoView {
     match decode(&json) {
-        Ok(decoded) => Either::Left(view! {
+        Ok(asset_list) => Either::Left(view! {
             <div class=SUPPLEMENTAL_VIEW_CLASS>
                 <p class=UNDERLINED>"ASSETS"</p>
-                <table>
+                <table class=SPACER_BOTTOM>
                     <tr>
                         <th>"URI"</th>
                         <th>"DURATION"</th>
                     </tr>
-                    {decoded
-                        .asset_list
+                    {asset_list
                         .assets
                         .iter()
                         .map(|asset| {
@@ -31,11 +29,11 @@ pub fn AssetListView(json: String) -> impl IntoView {
                         })
                         .collect_view()}
                 </table>
-                {if let Some(skip_control) = decoded.asset_list.skip_control {
+                {if let Some(skip_control) = asset_list.skip_control {
                     Either::Left(
                         view! {
                             <p class=UNDERLINED>"SKIP-CONTROL"</p>
-                            <table>
+                            <table class=SPACER_BOTTOM>
                                 <tr>
                                     <td>"OFFSET"</td>
                                     <td>{skip_control.offset}</td>
@@ -54,8 +52,8 @@ pub fn AssetListView(json: String) -> impl IntoView {
                 } else {
                     Either::Right(view! { <p class=UNDERLINED></p> })
                 }}
-                <p class=UNDERLINED>"Prettified JSON"</p>
-                <pre>{decoded.pretty_json}</pre>
+                <p class=UNDERLINED>"JSON"</p>
+                <code>{json}</code>
             </div>
         }),
         Err(error) => Either::Right(view! {
@@ -81,19 +79,10 @@ fn uri_link(uri: String) -> impl IntoView {
     }
 }
 
-fn decode(json: &str) -> Result<Decoded, serde_json::Error> {
+fn decode(json: &str) -> Result<AssetList, serde_json::Error> {
     let value = serde_json::from_str(json)?;
-    let pretty_json = to_string_pretty(&value)?;
     let asset_list = serde_json::from_value(value)?;
-    Ok(Decoded {
-        asset_list,
-        pretty_json,
-    })
-}
-
-struct Decoded {
-    asset_list: AssetList,
-    pretty_json: String,
+    Ok(asset_list)
 }
 
 #[derive(Deserialize)]

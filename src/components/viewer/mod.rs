@@ -6,19 +6,19 @@ mod playlist;
 mod preformatted;
 mod scte35;
 
-use crate::{
-    components::viewer::playlist::HighlightedScte35Info,
-    utils::{
-        network::{fetch_array_buffer, FetchError, FetchTextResponse, RequestRange},
-        query_codec::{MediaSegmentContext, PartSegmentContext, SupplementalViewQueryContext},
-        response::{determine_segment_type, SegmentType},
+use crate::utils::{
+    network::{fetch_array_buffer, fetch_text, FetchError, FetchTextResponse, RequestRange},
+    query_codec::{
+        AssetListContext, MediaSegmentContext, PartSegmentContext, SupplementalViewQueryContext,
     },
+    response::{determine_segment_type, SegmentType},
 };
+use asset_list::AssetListView;
 use error::ViewerError;
 use isobmff::IsobmffViewer;
-use leptos::prelude::*;
+use leptos::{either::Either, prelude::*};
 pub use loading::ViewerLoading;
-use playlist::{HighlightedMapInfo, HighlightedPartInfo, PlaylistViewer};
+use playlist::{Highlighted, PlaylistViewer};
 use preformatted::PreformattedViewer;
 use scte35::Scte35Viewer;
 use std::collections::HashMap;
@@ -39,6 +39,7 @@ const HIGHLIGHTED_URI_CLASS: &str = "hls-line uri highlighted";
 const UNDERLINED: &str = "underlined";
 const LINE_BREAK_ANYWHERE: &str = "line-break-anywhere";
 const LINE_BREAK_WORD: &str = "line-break-word";
+const SPACER_BOTTOM: &str = "spacer-bottom-large";
 
 #[component]
 pub fn Viewer(
@@ -87,11 +88,8 @@ pub fn Viewer(
         }
     };
     match context {
-        SupplementalViewQueryContext::Scte35(scte35_context) => {
-            let highlighted_info = HighlightedScte35Info {
-                daterange_id: scte35_context.daterange_id.clone(),
-                command_type: scte35_context.command_type,
-            };
+        SupplementalViewQueryContext::AssetList(asset_list_context) => {
+            let AssetListContext { url, daterange_id } = asset_list_context;
             view! {
                 <Container>
                     <ErrorBounded>
@@ -99,7 +97,29 @@ pub fn Viewer(
                             playlist
                             imported_definitions
                             supplemental_showing=true
-                            highlighted_scte35_info=highlighted_info
+                            highlighted=Highlighted::AssetList {
+                                daterange_id,
+                            }
+                        />
+                    </ErrorBounded>
+                    <LoadingAssetListView asset_list_url=url />
+                </Container>
+            }
+        }
+        SupplementalViewQueryContext::Scte35(scte35_context) => {
+            let daterange_id = scte35_context.daterange_id.clone();
+            let command_type = scte35_context.command_type;
+            view! {
+                <Container>
+                    <ErrorBounded>
+                        <PlaylistViewer
+                            playlist
+                            imported_definitions
+                            supplemental_showing=true
+                            highlighted=Highlighted::Scte35 {
+                                daterange_id,
+                                command_type,
+                            }
                         />
                     </ErrorBounded>
                     <Scte35Viewer context=scte35_context />
@@ -119,7 +139,9 @@ pub fn Viewer(
                             playlist
                             imported_definitions
                             supplemental_showing=true
-                            highlighted_segment=media_sequence
+                            highlighted=Highlighted::Segment {
+                                media_sequence,
+                            }
                         />
                     </ErrorBounded>
                     <SupplementalSegmentView segment_url=url.clone() byterange />
@@ -141,7 +163,7 @@ pub fn Viewer(
                             playlist
                             imported_definitions
                             supplemental_showing=true
-                            highlighted_map_info=HighlightedMapInfo {
+                            highlighted=Highlighted::Map {
                                 url: url_for_playlist_viewer,
                                 min_media_sequence: media_sequence,
                             }
@@ -168,7 +190,7 @@ pub fn Viewer(
                             playlist
                             imported_definitions
                             supplemental_showing=true
-                            highlighted_part_info=HighlightedPartInfo {
+                            highlighted=Highlighted::Part {
                                 media_sequence,
                                 part_index,
                             }
@@ -250,6 +272,37 @@ fn SupplementalSegmentView(segment_url: String, byterange: Option<RequestRange>)
                                 Err(e) => {
                                     view! { <ViewerError error=e.error extra_info=e.extra_info /> }
                                         .into_any()
+                                }
+                            }
+                        })
+                }}
+            </ErrorBounded>
+        </Suspense>
+    }
+}
+
+#[component]
+fn LoadingAssetListView(asset_list_url: String) -> impl IntoView {
+    let asset_list_result = LocalResource::new(move || fetch_text(asset_list_url.clone()));
+    view! {
+        <Suspense fallback=|| {
+            view! { <div class=SUPPLEMENTAL_VIEW_CLASS>"LOADING..."</div> }
+        }>
+            <ErrorBounded>
+                {move || {
+                    asset_list_result
+                        .get()
+                        .map(|fetch_response| {
+                            match fetch_response {
+                                Ok(r) => {
+                                    Either::Left(view! { <AssetListView json=r.response_text /> })
+                                }
+                                Err(e) => {
+                                    Either::Right(
+                                        view! {
+                                            <ViewerError error=e.error extra_info=e.extra_info />
+                                        },
+                                    )
                                 }
                             }
                         })

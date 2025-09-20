@@ -53,11 +53,18 @@ pub struct Scte35Context {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct AssetListContext {
+    pub url: String,
+    pub daterange_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum SupplementalViewQueryContext {
     Segment(MediaSegmentContext),
     Map(MediaSegmentContext),
     Part(PartSegmentContext),
     Scte35(Scte35Context),
+    AssetList(AssetListContext),
 }
 
 pub fn encode_segment(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
@@ -88,6 +95,13 @@ pub fn encode_part(
 pub fn encode_scte35(message: &str, daterange_id: &str, command_type: Scte35CommandType) -> String {
     percent_encode(&format!(
         "SCTE35,{command_type},{daterange_id}{SPECIAL_SEPARATOR}{message}"
+    ))
+    .to_string()
+}
+
+pub fn encode_asset_list(url: &str, daterange_id: &str) -> String {
+    percent_encode(&format!(
+        "ASSET_LIST,{daterange_id}{SPECIAL_SEPARATOR}{url}"
     ))
     .to_string()
 }
@@ -252,6 +266,19 @@ impl TryFrom<&str> for SupplementalViewQueryContext {
                     command_type,
                 }))
             }
+            "ASSET_LIST" => {
+                let Some(value) = split.next() else {
+                    return Err(SupplementalViewQueryContextDecodeError::EmptyContextValue);
+                };
+                let mut split = value.splitn(2, SPECIAL_SEPARATOR);
+                let Some(daterange_id) = split.next().map(String::from) else {
+                    return Err(SupplementalViewQueryContextDecodeError::MissingDaterangeId);
+                };
+                let Some(url) = split.next().map(String::from) else {
+                    return Err(SupplementalViewQueryContextDecodeError::MissingAssetListUrl);
+                };
+                Ok(Self::AssetList(AssetListContext { url, daterange_id }))
+            }
             _ => Err(SupplementalViewQueryContextDecodeError::UnknownContextType(
                 type_part.to_string(),
             )),
@@ -309,6 +336,7 @@ impl SupplementalViewQueryContext {
                 p.segment_context.byterange,
             ),
             Self::Scte35(s) => encode_scte35(&s.message, &s.daterange_id, s.command_type),
+            Self::AssetList(a) => encode_asset_list(&a.url, &a.daterange_id),
         }
     }
 }
@@ -329,6 +357,7 @@ pub enum SupplementalViewQueryContextDecodeError {
     InvalidCommandType(InvalidScte35CommandType),
     MissingDaterangeId,
     MissingScte35Message,
+    MissingAssetListUrl,
 }
 impl Display for SupplementalViewQueryContextDecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -362,6 +391,7 @@ impl Display for SupplementalViewQueryContextDecodeError {
             Self::InvalidCommandType(e) => e.fmt(f),
             Self::MissingDaterangeId => write!(f, "missing expected scte35 daterange id"),
             Self::MissingScte35Message => write!(f, "missing expected scte35 message"),
+            Self::MissingAssetListUrl => write!(f, "missing expected asset list url"),
         }
     }
 }
@@ -604,6 +634,18 @@ mod tests {
             }),
             encoded: "SCTE35,CMD,test%3Dtrue%22{SCTE35_IN_MESSAGE}",
             decoded: "SCTE35,CMD,test=true\"{SCTE35_IN_MESSAGE}"
+        );
+    }
+
+    #[test]
+    fn encode_decode_asset_list_should_encode_and_percent_encode_id() {
+        assert_codec_equality!(
+            input: SupplementalViewQueryContext::AssetList(AssetListContext {
+                url: String::from("https://example.com/ads.json"),
+                daterange_id: String::from("test=true"),
+            }),
+            encoded: "ASSET_LIST,test%3Dtrue%22https://example.com/ads.json",
+            decoded: "ASSET_LIST,test=true\"https://example.com/ads.json"
         );
     }
 
