@@ -1544,18 +1544,25 @@ pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
             box_name: "TrackRunBox",
             properties: vec![
                 ("data_offset", AtomPropertyValue::from(trun.data_offset)),
+                ("sample_count", AtomPropertyValue::from(trun.entries.len())),
                 (
                     "entries",
                     AtomPropertyValue::Table(TablePropertyValue {
-                        headers: Some(vec!["duration", "size", "flags", "cts"]),
+                        headers: Some(vec!["#", "duration", "size", "flags", "cts"]),
                         rows: trun
                             .entries
                             .iter()
-                            .map(|entry| {
+                            .enumerate()
+                            .map(|(index, entry)| {
                                 vec![
+                                    BasicPropertyValue::from(index + 1),
                                     BasicPropertyValue::from(entry.duration),
                                     BasicPropertyValue::from(entry.size),
-                                    BasicPropertyValue::from(entry.flags),
+                                    if let Some(flags) = entry.flags {
+                                        byte_array_string_from(&flags.to_be_bytes())
+                                    } else {
+                                        BasicPropertyValue::from(entry.flags)
+                                    },
                                     BasicPropertyValue::from(entry.cts),
                                 ]
                             })
@@ -1828,6 +1835,10 @@ fn audio_entry(
 
 fn byte_array_from(bytes: &[u8]) -> BasicPropertyValue {
     BasicPropertyValue::Hex(bytes.to_vec())
+}
+
+fn byte_array_string_from(bytes: &[u8]) -> BasicPropertyValue {
+    BasicPropertyValue::String(String::from(&byte_array_from(bytes)))
 }
 
 fn array_string_from<T: Display>(items: &[T]) -> String {
