@@ -118,6 +118,15 @@ pub fn asset_list_href(
     )
 }
 
+pub fn resolve_playlist_relative_url(
+    relative_uri: &str,
+    definitions: &HashMap<String, String>,
+) -> Option<String> {
+    let uri = replace_hls_variables(relative_uri, definitions);
+    let base = base_url()?;
+    base.join(&uri).ok().map(|url| url.to_string())
+}
+
 // These functions can't be run in tests because `use_url` must be run from within a Leptos `Router`
 // context (tests crash otherwise). Therefore, the bulk of the logic is extracted to below so that
 // it is testable.

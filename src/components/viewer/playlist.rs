@@ -6,7 +6,8 @@ use crate::{
     components::CopyButton,
     utils::{
         href::{
-            asset_list_href, map_href, media_playlist_href, part_href, scte35_href, segment_href,
+            asset_list_href, map_href, media_playlist_href, part_href,
+            resolve_playlist_relative_url, scte35_href, segment_href,
         },
         network::RequestRange,
         query_codec::Scte35CommandType,
@@ -261,7 +262,9 @@ fn x_map(tag: &UnknownTag, state: &mut ParsingState) {
             if let Some(info) = &state.highlighted_map_info {
                 !state.highlighted_one_map
                     && info.min_media_sequence <= state.media_sequence
-                    && info.url.contains(value)
+                    && resolve_playlist_relative_url(value, &state.local_definitions)
+                        .map(|s| s == info.url)
+                        .unwrap_or(false)
             } else {
                 false
             }
