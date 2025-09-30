@@ -3,7 +3,7 @@ use mp4_atom::{
 };
 use std::{fmt::Display, io::Cursor};
 
-use crate::utils::mp4::Prft;
+use crate::utils::mp4::{Frma, Prft, Schm};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AtomProperties {
@@ -1694,6 +1694,39 @@ pub fn get_properties(
                                 atom.ntp_timestamp_media_time_association
                             )),
                         ),
+                    ],
+                },
+                new_depth_until: None,
+            })
+        }
+        four_cc if four_cc == FourCC::new(b"sinf") => {
+            container(header, "ProtectionSchemeInfoBox", reader)
+        }
+        four_cc if four_cc == FourCC::new(b"schi") => {
+            container(header, "SchemeInformationBox", reader)
+        }
+        Frma::KIND => {
+            let atom = Frma::decode_atom(header, reader)?;
+            Ok(AtomPropertiesWithDepth {
+                properties: AtomProperties {
+                    box_name: "OriginalFormatBox",
+                    properties: vec![("data_format", AtomPropertyValue::from(atom.data_format))],
+                },
+                new_depth_until: None,
+            })
+        }
+        Schm::KIND => {
+            let atom = Schm::decode_atom(header, reader)?;
+            Ok(AtomPropertiesWithDepth {
+                properties: AtomProperties {
+                    box_name: "SchemeTypeBox",
+                    properties: vec![
+                        ("scheme_type", AtomPropertyValue::from(atom.scheme_type)),
+                        (
+                            "scheme_version",
+                            AtomPropertyValue::from(atom.scheme_version),
+                        ),
+                        ("scheme_uri", AtomPropertyValue::from(atom.scheme_uri)),
                     ],
                 },
                 new_depth_until: None,
