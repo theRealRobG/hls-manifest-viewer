@@ -1655,8 +1655,14 @@ pub fn get_properties(
         mp4_atom::Vp09::KIND => visual_entry(header, "VP09SampleEntryBox", reader),
         mp4_atom::Av01::KIND => visual_entry(header, "AV1SampleEntryBox", reader),
         mp4_atom::Uncv::KIND => visual_entry(header, "UncompressedFrameSampleEntryBox", reader),
+        four_cc if four_cc == FourCC::new(b"encv") => {
+            visual_entry(header, "EncryptedVisualSampleEntryBox", reader)
+        }
         mp4_atom::Mp4a::KIND => audio_entry(header, "MP4AudioSampleEntryBox", reader),
         mp4_atom::Opus::KIND => audio_entry(header, "OpusSampleEntryBox", reader),
+        four_cc if four_cc == FourCC::new(b"enca") => {
+            audio_entry(header, "EncryptedAudioSampleEntryBox", reader)
+        }
         mp4_atom::Mdat::KIND => {
             let remaining_box_size = header.size.unwrap_or_else(|| reader.remaining());
             reader.set_position(reader.position() + (remaining_box_size as u64));
