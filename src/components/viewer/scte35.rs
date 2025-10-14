@@ -1,12 +1,15 @@
 use super::{LINE_BREAK_ANYWHERE, LINE_BREAK_WORD, SUPPLEMENTAL_VIEW_CLASS, UNDERLINED};
 use crate::{
     components::viewer::error::ViewerError,
-    utils::query_codec::{Scte35CommandType, Scte35Context},
+    utils::{
+        hex::{decode_hex, DecodeHexError},
+        query_codec::{Scte35CommandType, Scte35Context},
+    },
 };
 use leptos::{either::Either, prelude::*};
 use scte35::parse_splice_info_section;
 use serde_json::to_string_pretty;
-use std::{error::Error, fmt::Display, io, num::ParseIntError};
+use std::{error::Error, fmt::Display, io};
 
 const SCTE35_TABLE: &str = "scte35-info-table";
 
@@ -82,18 +85,6 @@ fn decode_message(message: &str) -> Result<String, DecodeMessageError> {
     Ok(pretty_json)
 }
 
-// Directly copied from https://stackoverflow.com/a/52992629/7039100
-fn decode_hex(s: &str) -> Result<Vec<u8>, DecodeHexError> {
-    if s.len() % 2 != 0 {
-        Err(DecodeHexError::OddLength)
-    } else {
-        (0..s.len())
-            .step_by(2)
-            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|e| e.into()))
-            .collect()
-    }
-}
-
 #[derive(Debug)]
 enum DecodeMessageError {
     Hex(DecodeHexError),
@@ -125,23 +116,3 @@ impl From<serde_json::Error> for DecodeMessageError {
         Self::Json(value)
     }
 }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum DecodeHexError {
-    OddLength,
-    ParseInt(ParseIntError),
-}
-impl From<ParseIntError> for DecodeHexError {
-    fn from(e: ParseIntError) -> Self {
-        DecodeHexError::ParseInt(e)
-    }
-}
-impl Display for DecodeHexError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            DecodeHexError::OddLength => "input string has an odd number of bytes".fmt(f),
-            DecodeHexError::ParseInt(e) => e.fmt(f),
-        }
-    }
-}
-impl Error for DecodeHexError {}

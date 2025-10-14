@@ -3,7 +3,10 @@ use mp4_atom::{
 };
 use std::{fmt::Display, io::Cursor};
 
-use crate::utils::mp4::{Frma, Prft, Schm};
+use crate::utils::{
+    hex::encode_hex,
+    mp4::{Frma, Prft, Pssh, PsshData, Schm},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AtomProperties {
@@ -1727,6 +1730,123 @@ pub fn get_properties(
                             AtomPropertyValue::from(atom.scheme_version),
                         ),
                         ("scheme_uri", AtomPropertyValue::from(atom.scheme_uri)),
+                    ],
+                },
+                new_depth_until: None,
+            })
+        }
+        Pssh::KIND => {
+            let atom = Pssh::decode_atom(header, reader)?;
+            Ok(AtomPropertiesWithDepth {
+                properties: AtomProperties {
+                    box_name: "ProtectionSystemSpecificHeaderBox",
+                    properties: vec![
+                        (
+                            "system_id",
+                            AtomPropertyValue::from(encode_hex(&atom.system_id)),
+                        ),
+                        (
+                            "system_ref",
+                            AtomPropertyValue::from(atom.system_reference().as_ref()),
+                        ),
+                        (
+                            "key_ids",
+                            AtomPropertyValue::Table(TablePropertyValue {
+                                headers: None,
+                                rows: atom
+                                    .key_ids
+                                    .iter()
+                                    .map(|kid| vec![BasicPropertyValue::from(encode_hex(kid))])
+                                    .collect(),
+                            }),
+                        ),
+                        (
+                            "pssh_data",
+                            match atom.data {
+                                Some(PsshData::PlayReady(data)) => {
+                                    AtomPropertyValue::from(format!("{data:?}"))
+                                }
+                                Some(PsshData::Widevine(data)) => {
+                                    let mut rows = Vec::new();
+                                    if let Some(algorithm) = data.algorithm {
+                                        rows.push(vec![
+                                            BasicPropertyValue::from("algorithm"),
+                                            match algorithm {
+                                                0 => BasicPropertyValue::from("Unencrypted"),
+                                                1 => BasicPropertyValue::from("AESCTR"),
+                                                n => BasicPropertyValue::from(n),
+                                            },
+                                        ]);
+                                    }
+                                    rows.extend(data.key_id.iter().enumerate().map(
+                                        |(index, kid)| {
+                                            vec![
+                                                BasicPropertyValue::from(format!("key_id {index}")),
+                                                BasicPropertyValue::from(encode_hex(kid)),
+                                            ]
+                                        },
+                                    ));
+                                    if let Some(provider) = data.provider {
+                                        rows.push(vec![
+                                            BasicPropertyValue::from("provider"),
+                                            BasicPropertyValue::from(provider),
+                                        ]);
+                                    }
+                                    if let Some(content_id) = data.content_id {
+                                        rows.push(vec![
+                                            BasicPropertyValue::from("content_id"),
+                                            BasicPropertyValue::from(
+                                                String::from_utf8_lossy(&content_id).to_string(),
+                                            ),
+                                        ]);
+                                    }
+                                    if let Some(policy) = data.policy {
+                                        rows.push(vec![
+                                            BasicPropertyValue::from("policy"),
+                                            BasicPropertyValue::from(policy),
+                                        ]);
+                                    }
+                                    if let Some(crypto_period_index) = data.crypto_period_index {
+                                        rows.push(vec![
+                                            BasicPropertyValue::from("crypto_period_index"),
+                                            BasicPropertyValue::from(crypto_period_index),
+                                        ]);
+                                    }
+                                    if let Some(grouped_license) = data.grouped_license {
+                                        rows.push(vec![
+                                            BasicPropertyValue::from("grouped_license"),
+                                            BasicPropertyValue::from(
+                                                String::from_utf8_lossy(&grouped_license)
+                                                    .to_string(),
+                                            ),
+                                        ]);
+                                    }
+                                    if let Some(protection_scheme) = data.protection_scheme {
+                                        rows.push(vec![
+                                            BasicPropertyValue::from("protection_scheme"),
+                                            match protection_scheme {
+                                                0 => BasicPropertyValue::from("Unspecified"),
+                                                1667591779 => BasicPropertyValue::from("CENC"),
+                                                1667392305 => BasicPropertyValue::from("CBC1"),
+                                                1667591795 => BasicPropertyValue::from("CENS"),
+                                                1667392371 => BasicPropertyValue::from("CBCS"),
+                                                n => BasicPropertyValue::from(format!(
+                                                    "Unknown: {n}"
+                                                )),
+                                            },
+                                        ]);
+                                    }
+                                    AtomPropertyValue::Table(TablePropertyValue {
+                                        headers: None,
+                                        rows,
+                                    })
+                                }
+                                Some(PsshData::Raw(data)) => {
+                                    AtomPropertyValue::from(BasicPropertyValue::Hex(data))
+                                }
+                                None => AtomPropertyValue::from(String::new()),
+                            },
+                        ),
                     ],
                 },
                 new_depth_until: None,
