@@ -1,9 +1,6 @@
-use crate::utils::{
-    mp4_atom_properties::{AtomPropertyValue, BasicPropertyValue, TablePropertyValue},
-    pssh_data::{
-        playready::{self, PlayReadyPsshData},
-        widevine::WidevinePsshData,
-    },
+use crate::utils::pssh_data::{
+    playready::{self, PlayReadyPsshData},
+    widevine::WidevinePsshData,
 };
 use hex_literal::hex;
 use mp4_atom::{Atom, Buf, BufMut, Decode, FourCC, Result};
@@ -191,15 +188,6 @@ impl Atom for Schm {
 
     fn encode_body<B: BufMut>(&self, _: &mut B) -> Result<()> {
         unimplemented!()
-    }
-}
-
-fn deal_with_atom(atom: Pssh) -> AtomPropertyValue {
-    match atom.data {
-        Some(PsshData::PlayReady(data)) => todo!(),
-        Some(PsshData::Widevine(data)) => todo!(),
-        Some(PsshData::Raw(data)) => AtomPropertyValue::from(BasicPropertyValue::Hex(data)),
-        None => AtomPropertyValue::from(String::new()),
     }
 }
 

@@ -181,10 +181,10 @@ impl std::fmt::Debug for WidevinePsshData {
         if let Some(p) = &self.provider {
             items.push(format!("provider: {p}"));
         }
-        if let Some(p) = &self.policy {
-            if !p.is_empty() {
-                items.push(format!("policy: {p}"));
-            }
+        if let Some(p) = &self.policy
+            && !p.is_empty()
+        {
+            items.push(format!("policy: {p}"));
         }
         if let Some(cpi) = &self.crypto_period_index {
             items.push(format!("crypto_period_index: {cpi}"));

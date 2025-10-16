@@ -106,7 +106,6 @@ pub fn parse_pssh_data(buf: &[u8]) -> Result<PlayReadyPsshData, ParseError> {
     let record_count = rdr.read_u16()?;
     let mut records = Vec::with_capacity(record_count.into());
     for _ in 1..=record_count {
-        log::debug!("parsing playready record");
         records.push(parse_playready_record(&mut rdr)?);
     }
     Ok(PlayReadyPsshData { record: records })
@@ -149,7 +148,6 @@ fn parse_playready_record(rdr: &mut Cursor<&[u8]>) -> Result<PlayReadyRecord, Pa
     let mut kid = None;
     let mut protect_info = None;
     loop {
-        log::debug!("current element: {current_element:?}");
         let event = reader.read_event()?;
         match current_element {
             Element::Header => match event {
@@ -199,24 +197,24 @@ fn parse_playready_record(rdr: &mut Cursor<&[u8]>) -> Result<PlayReadyRecord, Pa
             },
             Element::Kid(parent) => match event {
                 Event::Text(bytes) => {
-                    if let Some(kid) = &mut kid {
-                        if let Some(text) = text(bytes) {
-                            if let Some(value) = &mut kid.value {
-                                value.push_str(&text);
-                            } else {
-                                kid.value = Some(text);
-                            }
+                    if let Some(kid) = &mut kid
+                        && let Some(text) = text(bytes)
+                    {
+                        if let Some(value) = &mut kid.value {
+                            value.push_str(&text);
+                        } else {
+                            kid.value = Some(text);
                         }
                     }
                 }
                 Event::CData(bytes) => {
-                    if let Some(kid) = &mut kid {
-                        if let Some(text) = cdata(bytes) {
-                            if let Some(value) = &mut kid.value {
-                                value.push_str(&text);
-                            } else {
-                                kid.value = Some(text);
-                            }
+                    if let Some(kid) = &mut kid
+                        && let Some(text) = cdata(bytes)
+                    {
+                        if let Some(value) = &mut kid.value {
+                            value.push_str(&text);
+                        } else {
+                            kid.value = Some(text);
                         }
                     }
                 }
@@ -321,13 +319,12 @@ fn parse_playready_record(rdr: &mut Cursor<&[u8]>) -> Result<PlayReadyRecord, Pa
                 }
             }
             Element::Kids => match event {
-                Event::Start(ref bytes) => match bytes.name().as_ref() {
-                    b"KID" => {
+                Event::Start(ref bytes) => {
+                    if bytes.name().as_ref() == b"KID" {
                         kid = Some(key_id(bytes));
                         current_element = Element::Kid(KidParent::Kids);
                     }
-                    _ => (),
-                },
+                }
                 Event::End(bytes) if bytes.name().as_ref() == b"KIDS" => current_element.close(),
                 Event::Eof => return Err(ParseError::UnexpectedEndOfXml),
                 _ => (),

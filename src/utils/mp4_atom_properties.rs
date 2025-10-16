@@ -6,6 +6,7 @@ use std::{fmt::Display, io::Cursor};
 use crate::utils::{
     hex::encode_hex,
     mp4::{Frma, Prft, Pssh, PsshData, Schm},
+    pssh_data::playready::PlayReadyRecordType,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1764,7 +1765,96 @@ pub fn get_properties(
                             "pssh_data",
                             match atom.data {
                                 Some(PsshData::PlayReady(data)) => {
-                                    AtomPropertyValue::from(format!("{data:?}"))
+                                    let mut rows = Vec::new();
+                                    let should_add_row_headers = data.record.len() > 1;
+                                    let mut count = 0;
+                                    for record in data.record {
+                                        count += 1;
+                                        if should_add_row_headers {
+                                            rows.push(vec![
+                                                BasicPropertyValue::from(format!("Record {count}")),
+                                                BasicPropertyValue::from(""),
+                                            ]);
+                                        }
+                                        rows.push(vec![
+                                            BasicPropertyValue::from("type"),
+                                            match record.record_type {
+                                                PlayReadyRecordType::RightsManagement => {
+                                                    BasicPropertyValue::from("RightsManagement")
+                                                }
+                                                PlayReadyRecordType::Reserved => {
+                                                    BasicPropertyValue::from("Reserved")
+                                                }
+                                                PlayReadyRecordType::EmbeddedLicenseStore => {
+                                                    BasicPropertyValue::from("EmbeddedLicenseStore")
+                                                }
+                                            },
+                                        ]);
+                                        let header = record.record_value;
+                                        rows.extend([
+                                            vec![
+                                                BasicPropertyValue::from("xmlns"),
+                                                BasicPropertyValue::from(header.xmlns),
+                                            ],
+                                            vec![
+                                                BasicPropertyValue::from("version"),
+                                                BasicPropertyValue::from(header.version),
+                                            ],
+                                        ]);
+                                        let mut kid_count = 0;
+                                        for kid in header.data.kids {
+                                            kid_count += 1;
+                                            rows.push(vec![
+                                                BasicPropertyValue::from(format!(
+                                                    "KID {kid_count}"
+                                                )),
+                                                BasicPropertyValue::from(""),
+                                            ]);
+                                            push_row(&mut rows, "algid", kid.algid);
+                                            push_row(&mut rows, "checksum", kid.checksum);
+                                            push_row(&mut rows, "kid", kid.value);
+                                        }
+                                        if let Some(protect_info) = header.data.protect_info {
+                                            for kid in protect_info.kids {
+                                                kid_count += 1;
+                                                rows.push(vec![
+                                                    BasicPropertyValue::from(format!(
+                                                        "KID {kid_count}"
+                                                    )),
+                                                    BasicPropertyValue::from(""),
+                                                ]);
+                                                push_row(
+                                                    &mut rows,
+                                                    "algid",
+                                                    protect_info
+                                                        .algid
+                                                        .as_ref()
+                                                        .or(kid.algid.as_ref()),
+                                                );
+                                                push_row(&mut rows, "keylen", protect_info.keylen);
+                                                push_row(&mut rows, "checksum", kid.checksum);
+                                                push_row(&mut rows, "kid", kid.value);
+                                            }
+                                        }
+                                        push_row(&mut rows, "checksum", header.data.checksum);
+                                        push_row(&mut rows, "la_url", header.data.la_url);
+                                        push_row(&mut rows, "lui_url", header.data.lui_url);
+                                        push_row(&mut rows, "ds_id", header.data.ds_id);
+                                        push_row(
+                                            &mut rows,
+                                            "custom_attributes",
+                                            header.data.custom_attributes,
+                                        );
+                                        push_row(
+                                            &mut rows,
+                                            "decryptor_setup",
+                                            header.data.decryptor_setup,
+                                        );
+                                    }
+                                    AtomPropertyValue::Table(TablePropertyValue {
+                                        headers: None,
+                                        rows,
+                                    })
                                 }
                                 Some(PsshData::Widevine(data)) => {
                                     let mut rows = Vec::new();
@@ -2006,4 +2096,17 @@ fn array_string_from<T: Display>(items: &[T]) -> String {
         .map(|item| format!("{item}"))
         .collect::<Vec<String>>()
         .join(", ")
+}
+
+fn push_row<K, V>(rows: &mut Vec<Vec<BasicPropertyValue>>, key: K, value: Option<V>)
+where
+    BasicPropertyValue: From<K>,
+    BasicPropertyValue: From<V>,
+{
+    if let Some(v) = value {
+        rows.push(vec![
+            BasicPropertyValue::from(key),
+            BasicPropertyValue::from(v),
+        ]);
+    }
 }
