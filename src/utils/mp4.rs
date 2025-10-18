@@ -1,10 +1,9 @@
-use crate::utils::pssh_data::{
-    playready::{self, PlayReadyPsshData},
-    widevine::WidevinePsshData,
-};
+use crate::utils::pssh_data::playready::{self, PlayReadyPsshData};
 use hex_literal::hex;
 use mp4_atom::{Atom, Buf, BufMut, Decode, FourCC, Result};
-use std::{borrow::Cow, fmt::Display, io::Cursor};
+use protobuf::Message;
+use std::{borrow::Cow, fmt::Display};
+use widevine_proto::license_protocol::WidevinePsshData;
 
 /// ProducerReferenceTimeBox, ISO/IEC 14496-12:2024 Sect 8.16.5
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -200,7 +199,7 @@ pub struct Pssh {
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum PsshData {
-    Widevine(WidevinePsshData),
+    Widevine(Box<WidevinePsshData>),
     PlayReady(PlayReadyPsshData),
     Raw(Vec<u8>),
 }
@@ -332,12 +331,12 @@ impl Atom for Pssh {
                 })
             }
             WIDEVINE_DRM_SYSTEM_ID => {
-                let pssh_data = <WidevinePsshData as prost::Message>::decode(Cursor::new(data))
+                let pssh_data = WidevinePsshData::parse_from_bytes(&data)
                     .map_err(|e| mp4_atom::Error::InvalidString(format!("{e:?}")))?;
                 Ok(Self {
                     system_id,
                     key_ids,
-                    data: Some(PsshData::Widevine(pssh_data)),
+                    data: Some(PsshData::Widevine(Box::new(pssh_data))),
                 })
             }
             _ => Ok(Self {
