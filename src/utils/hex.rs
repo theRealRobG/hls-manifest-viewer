@@ -11,9 +11,9 @@ pub fn encode_hex(bytes: &[u8]) -> String {
     s
 }
 
-// Directly copied from https://stackoverflow.com/a/52992629/7039100
+// Copied from https://stackoverflow.com/a/52992629/7039100
 pub fn decode_hex(s: &str) -> Result<Vec<u8>, DecodeHexError> {
-    if s.len() % 2 != 0 {
+    if !s.len().is_multiple_of(2) {
         Err(DecodeHexError::OddLength)
     } else {
         (0..s.len())
