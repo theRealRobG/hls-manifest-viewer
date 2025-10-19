@@ -6,7 +6,7 @@ use widevine_proto::license_protocol::widevine_pssh_data::{Algorithm, Type};
 
 use crate::utils::{
     hex::encode_hex,
-    mp4::{Frma, Prft, Pssh, PsshData, Schm},
+    mp4::{Frma, Prft, Pssh, PsshData, Schm, Tenc},
     pssh_data::playready::PlayReadyRecordType,
 };
 
@@ -1871,7 +1871,7 @@ pub fn get_properties(
                                         rows.push(vec![
                                             BasicPropertyValue::from("content_id"),
                                             BasicPropertyValue::from(
-                                                String::from_utf8_lossy(content_id).to_string(),
+                                                String::from_utf8_lossy(content_id).as_ref(),
                                             ),
                                         ]);
                                     }
@@ -1931,7 +1931,7 @@ pub fn get_properties(
                                                 "group_id {group_id_count}"
                                             )),
                                             BasicPropertyValue::from(
-                                                String::from_utf8_lossy(group_id).to_string(),
+                                                String::from_utf8_lossy(group_id).as_ref(),
                                             ),
                                         ]);
                                     }
@@ -1948,7 +1948,7 @@ pub fn get_properties(
                                             rows.push(vec![
                                                 BasicPropertyValue::from("entitlement_key_id"),
                                                 BasicPropertyValue::from(
-                                                    String::from_utf8_lossy(id).to_string(),
+                                                    String::from_utf8_lossy(id).as_ref(),
                                                 ),
                                             ]);
                                         }
@@ -1956,7 +1956,7 @@ pub fn get_properties(
                                             rows.push(vec![
                                                 BasicPropertyValue::from("key_id"),
                                                 BasicPropertyValue::from(
-                                                    String::from_utf8_lossy(id).to_string(),
+                                                    String::from_utf8_lossy(id).as_ref(),
                                                 ),
                                             ]);
                                         }
@@ -1964,7 +1964,7 @@ pub fn get_properties(
                                             rows.push(vec![
                                                 BasicPropertyValue::from("key"),
                                                 BasicPropertyValue::from(
-                                                    String::from_utf8_lossy(id).to_string(),
+                                                    String::from_utf8_lossy(id).as_ref(),
                                                 ),
                                             ]);
                                         }
@@ -1972,7 +1972,7 @@ pub fn get_properties(
                                             rows.push(vec![
                                                 BasicPropertyValue::from("iv"),
                                                 BasicPropertyValue::from(
-                                                    String::from_utf8_lossy(iv).to_string(),
+                                                    String::from_utf8_lossy(iv).as_ref(),
                                                 ),
                                             ]);
                                         }
@@ -2027,8 +2027,7 @@ pub fn get_properties(
                                         rows.push(vec![
                                             BasicPropertyValue::from("grouped_license"),
                                             BasicPropertyValue::from(
-                                                String::from_utf8_lossy(grouped_license)
-                                                    .to_string(),
+                                                String::from_utf8_lossy(grouped_license).as_ref(),
                                             ),
                                         ]);
                                     }
@@ -2044,6 +2043,64 @@ pub fn get_properties(
                             },
                         ),
                     ],
+                },
+                new_depth_until: None,
+            })
+        }
+        Tenc::KIND => {
+            let atom = Tenc::decode_atom(header, reader)?;
+            let mut properties = vec![
+                (
+                    "default_isProtected",
+                    AtomPropertyValue::from(format!(
+                        "{} ({})",
+                        atom.default_is_protected,
+                        atom.is_protected(),
+                    )),
+                ),
+                (
+                    "default_Per_Sample_IV_Size",
+                    AtomPropertyValue::from(format!(
+                        "{} ({})",
+                        atom.default_per_sample_iv_size,
+                        atom.per_sample_iv_size(),
+                    )),
+                ),
+                (
+                    "default_KID",
+                    AtomPropertyValue::from(encode_hex(&atom.default_key_id)),
+                ),
+            ];
+            if let Some(ref default_constant_iv) = atom.default_constant_iv {
+                properties.push((
+                    "default_constant_IV_size",
+                    AtomPropertyValue::from(format!(
+                        "{} ({})",
+                        default_constant_iv.len(),
+                        atom.constant_iv_size()
+                    )),
+                ));
+                properties.push((
+                    "default_constant_IV",
+                    AtomPropertyValue::from(encode_hex(default_constant_iv)),
+                ));
+            }
+            if let Some(default_crypt_byte_block) = atom.default_crypt_byte_block {
+                properties.push((
+                    "default_crypt_byte_block",
+                    AtomPropertyValue::from(default_crypt_byte_block),
+                ));
+            }
+            if let Some(default_skip_byte_block) = atom.default_skip_byte_block {
+                properties.push((
+                    "default_skip_byte_block",
+                    AtomPropertyValue::from(default_skip_byte_block),
+                ));
+            }
+            Ok(AtomPropertiesWithDepth {
+                properties: AtomProperties {
+                    box_name: "TrackEncryptionBox",
+                    properties,
                 },
                 new_depth_until: None,
             })
