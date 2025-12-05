@@ -1,4 +1,4 @@
-use crate::utils::mp4::{Frma, Prft, Pssh, Schm, Tenc};
+use crate::utils::mp4::{Frma, Prft, Pssh, Schm, Senc, Tenc};
 use mp4_atom::{Any, Atom, Audio, Buf, Decode, DecodeAtom, FourCC, Header, Visual};
 use std::{fmt::Display, io::Cursor};
 
@@ -66,6 +66,7 @@ mod saio;
 mod saiz;
 mod sbgp;
 mod schm;
+mod senc;
 mod sgpd;
 mod skip;
 mod smhd;
@@ -494,6 +495,27 @@ pub fn get_properties(
                 new_depth_until: None,
             })
         }
+        Senc::KIND => match Senc::decode_atom(header, reader) {
+            Ok(atom) => Ok(AtomPropertiesWithDepth {
+                properties: atom.properties(),
+                new_depth_until: None,
+            }),
+            Err(error) => match error {
+                mp4_atom::Error::Unsupported(e) if e == Senc::UNKNOWN_IV_SIZE => {
+                    if let Some(size) = header.size {
+                        reader.advance(size);
+                    }
+                    Ok(AtomPropertiesWithDepth {
+                        properties: AtomProperties {
+                            box_name: "SampleEncryptionBox",
+                            properties: vec![("IV", AtomPropertyValue::from("Unsupported size"))],
+                        },
+                        new_depth_until: None,
+                    })
+                }
+                _ => Err(error),
+            },
+        },
         // Everything else
         _ => {
             let atom = Any::decode_atom(header, reader)?;
