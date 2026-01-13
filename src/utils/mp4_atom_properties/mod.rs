@@ -1,4 +1,4 @@
-use crate::utils::mp4::{Frma, Prft, Pssh, Schm, Senc, Tenc};
+use crate::utils::mp4::{Colr, Frma, Prft, Pssh, Schm, Senc, Tenc};
 use mp4_atom::{Any, Atom, Audio, Buf, Decode, DecodeAtom, FourCC, Header, Visual};
 use std::{fmt::Display, io::Cursor};
 
@@ -322,7 +322,6 @@ pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
         Any::Avcc(avcc) => avcc.properties(),
         Any::Btrt(btrt) => btrt.properties(),
         Any::Ccst(ccst) => ccst.properties(),
-        Any::Colr(colr) => colr.properties(),
         Any::Pasp(pasp) => pasp.properties(),
         Any::Taic(taic) => taic.properties(),
         Any::Hvcc(hvcc) => hvcc.properties(),
@@ -373,6 +372,7 @@ pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
         Any::Minf(_) => unimplemented!(), // MediaInformationBox
         Any::Stbl(_) => unimplemented!(), // SampleTableBox
         Any::Stsd(_) => unimplemented!(), // SampleDescriptionBox
+        Any::Colr(_) => unimplemented!(), // ColourInformationBox
         Any::Avc1(_) => unimplemented!(), // AVCSampleEntryBox
         Any::Hev1(_) => unimplemented!(), // HEVCSampleEntryBox
         Any::Hvc1(_) => unimplemented!(), // HEVCSampleEntryBox
@@ -516,6 +516,15 @@ pub fn get_properties(
                 _ => Err(error),
             },
         },
+        Colr::KIND => {
+            // Overriding implementation from mp4-atom to add unknown case and nclc case defined in
+            // QuickTime File Format.
+            let atom = Colr::decode_atom(header, reader)?;
+            Ok(AtomPropertiesWithDepth {
+                properties: atom.properties(),
+                new_depth_until: None,
+            })
+        }
         // Everything else
         _ => {
             let atom = Any::decode_atom(header, reader)?;

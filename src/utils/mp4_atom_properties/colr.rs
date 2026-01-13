@@ -1,12 +1,14 @@
-use crate::utils::mp4_atom_properties::{AtomProperties, AtomPropertyValue, AtomWithProperties};
-use mp4_atom::Colr;
+use crate::utils::{
+    mp4::Colr,
+    mp4_atom_properties::{AtomProperties, AtomPropertyValue, AtomWithProperties},
+};
 
 impl AtomWithProperties for Colr {
     fn properties(&self) -> AtomProperties {
         AtomProperties {
             box_name: "ColourInformationBox",
             properties: match self {
-                mp4_atom::Colr::Nclx {
+                Colr::Nclx {
                     colour_primaries,
                     transfer_characteristics,
                     matrix_coefficients,
@@ -27,13 +29,30 @@ impl AtomWithProperties for Colr {
                     ),
                     ("full_range_flag", AtomPropertyValue::from(*full_range_flag)),
                 ],
-                mp4_atom::Colr::Ricc { profile } => vec![
+                Colr::Ricc { profile } => vec![
                     ("colour_type", AtomPropertyValue::from("ricc")),
                     ("profile", AtomPropertyValue::from(profile)),
                 ],
-                mp4_atom::Colr::Prof { profile } => vec![
+                Colr::Prof { profile } => vec![
                     ("colour_type", AtomPropertyValue::from("prof")),
                     ("profile", AtomPropertyValue::from(profile)),
+                ],
+                Colr::Nclc {
+                    primaries_index,
+                    transfer_function_index,
+                    matrix_index,
+                } => vec![
+                    ("colour_type", AtomPropertyValue::from("nclc")),
+                    ("primaries_index", AtomPropertyValue::from(*primaries_index)),
+                    (
+                        "transfer_function_index",
+                        AtomPropertyValue::from(*transfer_function_index),
+                    ),
+                    ("matrix_index", AtomPropertyValue::from(*matrix_index)),
+                ],
+                Colr::Unknown { colour_type, bytes } => vec![
+                    ("colour_type", AtomPropertyValue::from(*colour_type)),
+                    ("bytes", AtomPropertyValue::from(bytes)),
                 ],
             },
         }
