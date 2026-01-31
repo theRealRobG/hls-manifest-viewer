@@ -439,6 +439,9 @@ pub fn get_properties(
         }
         mp4_atom::Mp4a::KIND => audio_entry(header, "MP4AudioSampleEntryBox", reader),
         mp4_atom::Opus::KIND => audio_entry(header, "OpusSampleEntryBox", reader),
+        four_cc if four_cc == FourCC::new(b"ac-4") => {
+            audio_entry(header, "AC4SampleEntryBox", reader)
+        }
         four_cc if four_cc == FourCC::new(b"enca") => {
             audio_entry(header, "EncryptedAudioSampleEntryBox", reader)
         }
