@@ -120,6 +120,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b8e56985ec62d17e9c1001dc89c88ecd7dc08e47eba5ec7c29c7b5eeecde967"
 
 [[package]]
+name = "bitter"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b901cc77d53ab0456afe5955ae6be367aaeb89b6ec2b6c174351eddd27e983c"
+
+[[package]]
 name = "bumpalo"
 version = "3.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -738,6 +744,7 @@ checksum = "bcaaec4551594c969335c98c903c1397853d4198408ea609190f420500f6be71"
 name = "hls-manifest-viewer"
 version = "0.1.0"
 dependencies = [
+ "bitter",
  "console_error_panic_hook",
  "console_log",
  "hex-literal",
