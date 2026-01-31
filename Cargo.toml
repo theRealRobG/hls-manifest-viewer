@@ -33,6 +33,7 @@ protobuf = "3.5"
 widevine-proto = "0.1.0"
 quick-xml = "0.38"
 hex-literal = "1.0.0"
+bitter = "0.8"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

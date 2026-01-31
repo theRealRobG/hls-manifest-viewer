@@ -1,3 +1,4 @@
+mod bitter;
 pub mod hex;
 pub mod href;
 pub mod mp4;
