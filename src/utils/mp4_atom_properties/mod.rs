@@ -1,4 +1,4 @@
-use crate::utils::mp4::{Colr, Frma, Prft, Pssh, Schm, Senc, Tenc};
+use crate::utils::mp4_parsing::{Colr, Frma, Prft, Pssh, Schm, Senc, Tenc};
 use mp4_atom::{Any, Atom, Audio, Buf, Decode, DecodeAtom, FourCC, Header, Visual};
 use std::{fmt::Display, io::Cursor};
 

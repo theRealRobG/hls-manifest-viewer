@@ -1,7 +1,7 @@
 use crate::utils::{
     hex::encode_hex,
-    mp4::Tenc,
     mp4_atom_properties::{AtomProperties, AtomPropertyValue, AtomWithProperties},
+    mp4_parsing::Tenc,
 };
 
 impl AtomWithProperties for Tenc {

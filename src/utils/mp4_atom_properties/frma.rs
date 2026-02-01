@@ -1,6 +1,6 @@
 use crate::utils::{
-    mp4::Frma,
     mp4_atom_properties::{AtomProperties, AtomPropertyValue, AtomWithProperties},
+    mp4_parsing::Frma,
 };
 
 impl AtomWithProperties for Frma {

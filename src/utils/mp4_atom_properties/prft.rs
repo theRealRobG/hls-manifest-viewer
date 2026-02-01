@@ -1,6 +1,6 @@
 use crate::utils::{
-    mp4::Prft,
     mp4_atom_properties::{AtomProperties, AtomPropertyValue, AtomWithProperties},
+    mp4_parsing::Prft,
 };
 
 impl AtomWithProperties for Prft {

@@ -1,9 +1,9 @@
 use crate::utils::{
-    mp4::Senc,
     mp4_atom_properties::{
         AtomProperties, AtomPropertyValue, AtomWithProperties, BasicPropertyValue,
         TablePropertyValue,
     },
+    mp4_parsing::Senc,
 };
 
 impl AtomWithProperties for Senc {

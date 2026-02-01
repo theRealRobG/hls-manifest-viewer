@@ -1,10 +1,10 @@
 use crate::utils::{
     hex::encode_hex,
-    mp4::{Pssh, PsshData},
     mp4_atom_properties::{
         AtomProperties, AtomPropertyValue, AtomWithProperties, BasicPropertyValue,
         TablePropertyValue,
     },
+    mp4_parsing::{pssh::PsshData, Pssh},
     pssh_data::playready::PlayReadyRecordType,
 };
 use widevine_proto::license_protocol::widevine_pssh_data::{Algorithm, Type};
