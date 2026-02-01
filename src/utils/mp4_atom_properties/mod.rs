@@ -1,4 +1,4 @@
-use crate::utils::mp4_parsing::{Colr, Frma, Prft, Pssh, Schm, Senc, Tenc};
+use crate::utils::mp4_parsing::{Colr, Frma, Lac4, Prft, Pssh, Schm, Senc, Tenc};
 use mp4_atom::{Any, Atom, Audio, Buf, Decode, DecodeAtom, FourCC, Header, Visual};
 use std::{fmt::Display, io::Cursor};
 
@@ -42,6 +42,7 @@ mod iref;
 mod irot;
 mod iscl;
 mod ispe;
+mod lac4;
 mod mdat;
 mod mdhd;
 mod mdia;
@@ -457,47 +458,23 @@ pub fn get_properties(
             })
         }
         // Custom atoms implemented in this lib
-        Prft::KIND => {
-            let atom = Prft::decode_atom(header, reader)?;
-            Ok(AtomPropertiesWithDepth {
-                properties: atom.properties(),
-                new_depth_until: None,
-            })
-        }
         four_cc if four_cc == FourCC::new(b"sinf") => {
             container(header, "ProtectionSchemeInfoBox", reader)
         }
         four_cc if four_cc == FourCC::new(b"schi") => {
             container(header, "SchemeInformationBox", reader)
         }
-        Frma::KIND => {
-            let atom = Frma::decode_atom(header, reader)?;
-            Ok(AtomPropertiesWithDepth {
-                properties: atom.properties(),
-                new_depth_until: None,
-            })
-        }
-        Schm::KIND => {
-            let atom = Schm::decode_atom(header, reader)?;
-            Ok(AtomPropertiesWithDepth {
-                properties: atom.properties(),
-                new_depth_until: None,
-            })
-        }
-        Pssh::KIND => {
-            let atom = Pssh::decode_atom(header, reader)?;
-            Ok(AtomPropertiesWithDepth {
-                properties: atom.properties(),
-                new_depth_until: None,
-            })
-        }
-        Tenc::KIND => {
-            let atom = Tenc::decode_atom(header, reader)?;
-            Ok(AtomPropertiesWithDepth {
-                properties: atom.properties(),
-                new_depth_until: None,
-            })
-        }
+        Prft::KIND => try_properties_from::<Prft>(header, reader),
+        Frma::KIND => try_properties_from::<Frma>(header, reader),
+        Schm::KIND => try_properties_from::<Schm>(header, reader),
+        Pssh::KIND => try_properties_from::<Pssh>(header, reader),
+        Tenc::KIND => try_properties_from::<Tenc>(header, reader),
+        Lac4::KIND => try_properties_from::<Lac4>(header, reader),
+        // Overriding implementation from mp4-atom to add unknown case and nclc case defined in
+        // QuickTime File Format.
+        Colr::KIND => try_properties_from::<Colr>(header, reader),
+        // senc doesn't quite fit in the same way as we provide a custom error in the case that we
+        // find one.
         Senc::KIND => match Senc::decode_atom(header, reader) {
             Ok(atom) => Ok(AtomPropertiesWithDepth {
                 properties: atom.properties(),
@@ -519,16 +496,6 @@ pub fn get_properties(
                 _ => Err(error),
             },
         },
-        Colr::KIND => {
-            // Overriding implementation from mp4-atom to add unknown case and nclc case defined in
-            // QuickTime File Format.
-            let atom = Colr::decode_atom(header, reader)?;
-            Ok(AtomPropertiesWithDepth {
-                properties: atom.properties(),
-                new_depth_until: None,
-            })
-        }
-        // Everything else
         _ => {
             let atom = Any::decode_atom(header, reader)?;
             let properties = get_properties_from_atom(&atom);
@@ -541,6 +508,21 @@ pub fn get_properties(
     // Wow... I'm really bad at naming things
     properties.properties.properties.insert(0, ("size", size));
     Ok(properties)
+}
+
+fn try_properties_from<T>(
+    header: &Header,
+    reader: &mut Cursor<Vec<u8>>,
+) -> mp4_atom::Result<AtomPropertiesWithDepth>
+where
+    T: Atom,
+    T: AtomWithProperties,
+{
+    let atom = T::decode_atom(header, reader)?;
+    Ok(AtomPropertiesWithDepth {
+        properties: atom.properties(),
+        new_depth_until: None,
+    })
 }
 
 fn decode_container_version_and_flags(
