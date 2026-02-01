@@ -3,9 +3,9 @@ use mp4_atom::Imir;
 
 impl AtomWithProperties for Imir {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "ImageMirror",
-            properties: vec![("axis", AtomPropertyValue::from(self.axis))],
-        }
+        AtomProperties::from_static_keys(
+            "ImageMirror",
+            vec![("axis", AtomPropertyValue::from(self.axis))],
+        )
     }
 }

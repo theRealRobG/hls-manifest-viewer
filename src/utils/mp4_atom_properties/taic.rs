@@ -3,9 +3,9 @@ use mp4_atom::Taic;
 
 impl AtomWithProperties for Taic {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "TAIClockInfoBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "TAIClockInfoBox",
+            vec![
                 (
                     "time_uncertainty",
                     AtomPropertyValue::from(self.time_uncertainty),
@@ -28,6 +28,6 @@ impl AtomWithProperties for Taic {
                     }),
                 ),
             ],
-        }
+        )
     }
 }

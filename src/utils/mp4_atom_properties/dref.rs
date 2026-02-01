@@ -5,9 +5,9 @@ use mp4_atom::Dref;
 
 impl AtomWithProperties for Dref {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "DataReferenceBox",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "DataReferenceBox",
+            vec![(
                 "urls",
                 AtomPropertyValue::Table(TablePropertyValue {
                     headers: None,
@@ -18,6 +18,6 @@ impl AtomWithProperties for Dref {
                         .collect(),
                 }),
             )],
-        }
+        )
     }
 }

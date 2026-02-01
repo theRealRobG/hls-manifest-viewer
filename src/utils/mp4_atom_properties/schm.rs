@@ -5,9 +5,9 @@ use crate::utils::{
 
 impl AtomWithProperties for Schm {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "SchemeTypeBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "SchemeTypeBox",
+            vec![
                 ("scheme_type", AtomPropertyValue::from(self.scheme_type)),
                 (
                     "scheme_version",
@@ -18,6 +18,6 @@ impl AtomWithProperties for Schm {
                     AtomPropertyValue::from(self.scheme_uri.as_ref()),
                 ),
             ],
-        }
+        )
     }
 }

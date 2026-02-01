@@ -5,9 +5,9 @@ use mp4_atom::Stts;
 
 impl AtomWithProperties for Stts {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "TimeToSampleBox",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "TimeToSampleBox",
+            vec![(
                 "entries",
                 AtomPropertyValue::Table(TablePropertyValue {
                     headers: Some(vec!["count", "delta"]),
@@ -23,6 +23,6 @@ impl AtomWithProperties for Stts {
                         .collect(),
                 }),
             )],
-        }
+        )
     }
 }

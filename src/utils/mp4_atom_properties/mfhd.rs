@@ -3,12 +3,12 @@ use mp4_atom::Mfhd;
 
 impl AtomWithProperties for Mfhd {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "MovieFragmentHeaderBox",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "MovieFragmentHeaderBox",
+            vec![(
                 "sequence_number",
                 AtomPropertyValue::from(self.sequence_number),
             )],
-        }
+        )
     }
 }

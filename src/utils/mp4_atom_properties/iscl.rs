@@ -3,9 +3,9 @@ use mp4_atom::Iscl;
 
 impl AtomWithProperties for Iscl {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "ImageScaling",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "ImageScaling",
+            vec![
                 (
                     "target_width_numerator",
                     AtomPropertyValue::from(self.target_width_numerator),
@@ -23,6 +23,6 @@ impl AtomWithProperties for Iscl {
                     AtomPropertyValue::from(self.target_height_denominator),
                 ),
             ],
-        }
+        )
     }
 }

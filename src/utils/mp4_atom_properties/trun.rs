@@ -6,9 +6,9 @@ use mp4_atom::Trun;
 
 impl AtomWithProperties for Trun {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "TrackRunBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "TrackRunBox",
+            vec![
                 ("data_offset", AtomPropertyValue::from(self.data_offset)),
                 ("sample_count", AtomPropertyValue::from(self.entries.len())),
                 (
@@ -36,6 +36,6 @@ impl AtomWithProperties for Trun {
                     }),
                 ),
             ],
-        }
+        )
     }
 }

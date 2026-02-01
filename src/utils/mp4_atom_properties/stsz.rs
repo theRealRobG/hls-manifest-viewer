@@ -5,9 +5,9 @@ use mp4_atom::Stsz;
 
 impl AtomWithProperties for Stsz {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "SampleSizeBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "SampleSizeBox",
+            vec![
                 (
                     "sample_count",
                     match &self.samples {
@@ -29,6 +29,6 @@ impl AtomWithProperties for Stsz {
                     ),
                 },
             ],
-        }
+        )
     }
 }

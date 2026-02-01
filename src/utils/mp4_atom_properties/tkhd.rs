@@ -5,9 +5,9 @@ use mp4_atom::Tkhd;
 
 impl AtomWithProperties for Tkhd {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "TrackHeaderBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "TrackHeaderBox",
+            vec![
                 ("creation_time", AtomPropertyValue::from(self.creation_time)),
                 (
                     "modification_time",
@@ -57,6 +57,6 @@ impl AtomWithProperties for Tkhd {
                     AtomPropertyValue::from(format!("{:?}", self.height)),
                 ),
             ],
-        }
+        )
     }
 }

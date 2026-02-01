@@ -8,9 +8,9 @@ use crate::utils::{
 
 impl AtomWithProperties for Lac4 {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "AC4PresentationLabelBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "AC4PresentationLabelBox",
+            vec![
                 (
                     "language_tag",
                     AtomPropertyValue::from(self.language_tag.clone()),
@@ -32,6 +32,6 @@ impl AtomWithProperties for Lac4 {
                     }),
                 ),
             ],
-        }
+        )
     }
 }

@@ -3,9 +3,9 @@ use mp4_atom::Ctts;
 
 impl AtomWithProperties for Ctts {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "CompositionOffsetBox",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "CompositionOffsetBox",
+            vec![(
                 "entries",
                 AtomPropertyValue::from(
                     self.entries
@@ -20,6 +20,6 @@ impl AtomWithProperties for Ctts {
                         .join(", "),
                 ),
             )],
-        }
+        )
     }
 }

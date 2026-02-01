@@ -1,11 +1,9 @@
-use crate::utils::mp4_parsing::{Colr, Frma, Lac4, Prft, Pssh, Schm, Senc, Tenc};
+use crate::utils::mp4_parsing::{Colr, Dac4, Frma, Lac4, Prft, Pssh, Schm, Senc, Tenc};
 use mp4_atom::{Any, Atom, Audio, Buf, Decode, DecodeAtom, FourCC, Header, Visual};
-use std::{fmt::Display, io::Cursor};
+use std::{borrow::Cow, fmt::Display, io::Cursor};
 
 mod auxc;
-mod av01;
 mod av1c;
-mod avc1;
 mod avcc;
 mod btrt;
 mod ccst;
@@ -16,10 +14,8 @@ mod colr;
 mod covr;
 mod ctts;
 mod desc;
-mod dinf;
 mod dops;
 mod dref;
-mod edts;
 mod elst;
 mod emsg;
 mod esds;
@@ -27,36 +23,22 @@ mod free;
 mod frma;
 mod ftyp;
 mod hdlr;
-mod hev1;
-mod hvc1;
 mod hvcc;
 mod idat;
 mod iinf;
 mod iloc;
-mod ilst;
 mod imir;
-mod ipco;
 mod ipma;
-mod iprp;
 mod iref;
 mod irot;
 mod iscl;
 mod ispe;
 mod lac4;
-mod mdat;
 mod mdhd;
-mod mdia;
 mod mehd;
-mod meta;
 mod mfhd;
-mod minf;
-mod moof;
-mod moov;
-mod mp4a;
-mod mvex;
 mod mvhd;
 mod name;
-mod opus;
 mod pasp;
 mod pitm;
 mod pixi;
@@ -71,10 +53,8 @@ mod senc;
 mod sgpd;
 mod skip;
 mod smhd;
-mod stbl;
 mod stco;
 mod stsc;
-mod stsd;
 mod stss;
 mod stsz;
 mod stts;
@@ -85,24 +65,33 @@ mod tenc;
 mod tfdt;
 mod tfhd;
 mod tkhd;
-mod traf;
-mod trak;
 mod trex;
 mod trun;
 mod tx3g;
-mod udta;
 mod uncc;
-mod uncv;
 mod vmhd;
-mod vp08;
-mod vp09;
 mod vpcc;
 mod year;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AtomProperties {
     pub box_name: &'static str,
-    pub properties: Vec<(&'static str, AtomPropertyValue)>,
+    pub properties: Vec<(Cow<'static, str>, AtomPropertyValue)>,
+}
+impl AtomProperties {
+    fn from_static_keys(
+        box_name: &'static str,
+        properties: Vec<(&'static str, AtomPropertyValue)>,
+    ) -> Self {
+        let mut v = Vec::with_capacity(properties.len());
+        for e in properties {
+            v.push((Cow::Borrowed(e.0), e.1));
+        }
+        Self {
+            box_name,
+            properties: v,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -360,7 +349,7 @@ pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
         Any::Free(free) => free.properties(),
         Any::Unknown(_, items) => AtomProperties {
             box_name: "Unknown (unhandled box parsing)",
-            properties: vec![("data", AtomPropertyValue::from(items))],
+            properties: vec![("data".into(), AtomPropertyValue::from(items))],
         },
         Any::Meta(_) => unimplemented!(), // MetaBox
         Any::Iprp(_) => unimplemented!(), // ItemPropertiesBox
@@ -488,7 +477,10 @@ pub fn get_properties(
                     Ok(AtomPropertiesWithDepth {
                         properties: AtomProperties {
                             box_name: "SampleEncryptionBox",
-                            properties: vec![("IV", AtomPropertyValue::from("Unsupported size"))],
+                            properties: vec![(
+                                "IV".into(),
+                                AtomPropertyValue::from("Unsupported size"),
+                            )],
                         },
                         new_depth_until: None,
                     })
@@ -506,7 +498,10 @@ pub fn get_properties(
         }
     }?;
     // Wow... I'm really bad at naming things
-    properties.properties.properties.insert(0, ("size", size));
+    properties
+        .properties
+        .properties
+        .insert(0, ("size".into(), size));
     Ok(properties)
 }
 
@@ -571,10 +566,7 @@ fn container(
     let new_depth_until = reader.position() + (header_size as u64);
     let version_and_flags = decode_container_version_and_flags(header, reader)?;
     Ok(AtomPropertiesWithDepth {
-        properties: AtomProperties {
-            box_name: name,
-            properties: version_and_flags,
-        },
+        properties: AtomProperties::from_static_keys(name, version_and_flags),
         new_depth_until: Some(new_depth_until),
     })
 }
@@ -589,9 +581,9 @@ fn visual_entry(
 
     let visual = Visual::decode(reader)?;
     Ok(AtomPropertiesWithDepth {
-        properties: AtomProperties {
-            box_name: name,
-            properties: vec![
+        properties: AtomProperties::from_static_keys(
+            name,
+            vec![
                 (
                     "data_reference_index",
                     AtomPropertyValue::from(visual.data_reference_index),
@@ -613,7 +605,7 @@ fn visual_entry(
                 ),
                 ("depth", AtomPropertyValue::from(visual.depth)),
             ],
-        },
+        ),
         new_depth_until: Some(new_depth_until),
     })
 }
@@ -628,9 +620,9 @@ fn audio_entry(
 
     let audio = Audio::decode(reader)?;
     Ok(AtomPropertiesWithDepth {
-        properties: AtomProperties {
-            box_name: name,
-            properties: vec![
+        properties: AtomProperties::from_static_keys(
+            name,
+            vec![
                 (
                     "data_reference_index",
                     AtomPropertyValue::from(audio.data_reference_index),
@@ -645,7 +637,7 @@ fn audio_entry(
                     AtomPropertyValue::from(format!("{:?}", audio.sample_rate)),
                 ),
             ],
-        },
+        ),
         new_depth_until: Some(new_depth_until),
     })
 }

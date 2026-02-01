@@ -5,9 +5,9 @@ use mp4_atom::Av1c;
 
 impl AtomWithProperties for Av1c {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "AV1CodecConfigurationBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "AV1CodecConfigurationBox",
+            vec![
                 ("seq_profile", AtomPropertyValue::from(self.seq_profile)),
                 (
                     "seq_level_idx_0",
@@ -38,6 +38,6 @@ impl AtomWithProperties for Av1c {
                     AtomPropertyValue::from(byte_array_from(&self.config_obus)),
                 ),
             ],
-        }
+        )
     }
 }

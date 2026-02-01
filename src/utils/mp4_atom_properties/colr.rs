@@ -5,9 +5,9 @@ use crate::utils::{
 
 impl AtomWithProperties for Colr {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "ColourInformationBox",
-            properties: match self {
+        AtomProperties::from_static_keys(
+            "ColourInformationBox",
+            match self {
                 Colr::Nclx {
                     colour_primaries,
                     transfer_characteristics,
@@ -55,6 +55,6 @@ impl AtomWithProperties for Colr {
                     ("bytes", AtomPropertyValue::from(bytes)),
                 ],
             },
-        }
+        )
     }
 }

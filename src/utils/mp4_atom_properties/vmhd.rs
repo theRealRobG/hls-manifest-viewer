@@ -3,9 +3,9 @@ use mp4_atom::Vmhd;
 
 impl AtomWithProperties for Vmhd {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "VideoMediaHeaderBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "VideoMediaHeaderBox",
+            vec![
                 ("graphics_mode", AtomPropertyValue::from(self.graphics_mode)),
                 (
                     "op_color",
@@ -15,6 +15,6 @@ impl AtomWithProperties for Vmhd {
                     )),
                 ),
             ],
-        }
+        )
     }
 }

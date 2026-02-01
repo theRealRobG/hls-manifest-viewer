@@ -5,9 +5,9 @@ use mp4_atom::VpcC;
 
 impl AtomWithProperties for VpcC {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "VPCodecConfigurationBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "VPCodecConfigurationBox",
+            vec![
                 ("profile", AtomPropertyValue::from(self.profile)),
                 ("level", AtomPropertyValue::from(self.level)),
                 ("bit_depth", AtomPropertyValue::from(self.bit_depth)),
@@ -36,6 +36,6 @@ impl AtomWithProperties for VpcC {
                     AtomPropertyValue::from(byte_array_from(&self.codec_initialization_data)),
                 ),
             ],
-        }
+        )
     }
 }

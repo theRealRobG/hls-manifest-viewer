@@ -3,9 +3,9 @@ use mp4_atom::Pixi;
 
 impl AtomWithProperties for Pixi {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "PixelInformationProperty",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "PixelInformationProperty",
+            vec![(
                 "bits_per_channel",
                 AtomPropertyValue::from(
                     self.bits_per_channel
@@ -15,6 +15,6 @@ impl AtomWithProperties for Pixi {
                         .join(", "),
                 ),
             )],
-        }
+        )
     }
 }

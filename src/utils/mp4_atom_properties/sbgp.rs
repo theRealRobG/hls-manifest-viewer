@@ -5,9 +5,9 @@ use mp4_atom::Sbgp;
 
 impl AtomWithProperties for Sbgp {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "SampleToGroupBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "SampleToGroupBox",
+            vec![
                 ("grouping_type", AtomPropertyValue::from(self.grouping_type)),
                 (
                     "grouping_type_parameter",
@@ -30,6 +30,6 @@ impl AtomWithProperties for Sbgp {
                     }),
                 ),
             ],
-        }
+        )
     }
 }

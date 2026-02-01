@@ -3,9 +3,9 @@ use mp4_atom::Btrt;
 
 impl AtomWithProperties for Btrt {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "BitRateBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "BitRateBox",
+            vec![
                 (
                     "buffer_size_db",
                     AtomPropertyValue::from(self.buffer_size_db),
@@ -13,6 +13,6 @@ impl AtomWithProperties for Btrt {
                 ("max_bitrate", AtomPropertyValue::from(self.max_bitrate)),
                 ("avg_bitrate", AtomPropertyValue::from(self.avg_bitrate)),
             ],
-        }
+        )
     }
 }

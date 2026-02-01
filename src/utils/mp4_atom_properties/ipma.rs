@@ -5,9 +5,9 @@ use mp4_atom::Ipma;
 
 impl AtomWithProperties for Ipma {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "ItemPropertyAssociationBox",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "ItemPropertyAssociationBox",
+            vec![(
                 "item_properties",
                 AtomPropertyValue::Table(TablePropertyValue {
                     headers: Some(vec!["item_id", "associations"]),
@@ -34,6 +34,6 @@ impl AtomWithProperties for Ipma {
                         .collect(),
                 }),
             )],
-        }
+        )
     }
 }

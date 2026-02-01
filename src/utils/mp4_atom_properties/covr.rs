@@ -3,9 +3,9 @@ use mp4_atom::Covr;
 
 impl AtomWithProperties for Covr {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "Covr MetadataItem",
-            properties: vec![("covr", AtomPropertyValue::from(&self.0))],
-        }
+        AtomProperties::from_static_keys(
+            "Covr MetadataItem",
+            vec![("covr", AtomPropertyValue::from(&self.0))],
+        )
     }
 }

@@ -3,9 +3,9 @@ use mp4_atom::Pitm;
 
 impl AtomWithProperties for Pitm {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "PrimaryItemBox",
-            properties: vec![("item_id", AtomPropertyValue::from(self.item_id))],
-        }
+        AtomProperties::from_static_keys(
+            "PrimaryItemBox",
+            vec![("item_id", AtomPropertyValue::from(self.item_id))],
+        )
     }
 }

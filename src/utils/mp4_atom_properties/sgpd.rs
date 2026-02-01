@@ -5,9 +5,9 @@ use mp4_atom::{AnySampleGroupEntry, Sgpd};
 
 impl AtomWithProperties for Sgpd {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "SampleGroupDescriptionBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "SampleGroupDescriptionBox",
+            vec![
                 ("grouping_type", AtomPropertyValue::from(self.grouping_type)),
                 (
                     "default_length",
@@ -44,6 +44,6 @@ impl AtomWithProperties for Sgpd {
                     }),
                 ),
             ],
-        }
+        )
     }
 }

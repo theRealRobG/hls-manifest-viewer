@@ -3,9 +3,9 @@ use mp4_atom::Idat;
 
 impl AtomWithProperties for Idat {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "ItemDataBox",
-            properties: vec![("data", AtomPropertyValue::from(&self.data))],
-        }
+        AtomProperties::from_static_keys(
+            "ItemDataBox",
+            vec![("data", AtomPropertyValue::from(&self.data))],
+        )
     }
 }

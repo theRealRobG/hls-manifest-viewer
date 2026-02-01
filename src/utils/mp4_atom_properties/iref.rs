@@ -5,9 +5,9 @@ use mp4_atom::Iref;
 
 impl AtomWithProperties for Iref {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "ItemReferenceBox",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "ItemReferenceBox",
+            vec![(
                 "references",
                 AtomPropertyValue::Table(TablePropertyValue {
                     headers: Some(vec!["reference_type", "from_item_id", "to_item_ids"]),
@@ -30,6 +30,6 @@ impl AtomWithProperties for Iref {
                         .collect(),
                 }),
             )],
-        }
+        )
     }
 }

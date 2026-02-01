@@ -5,9 +5,9 @@ use mp4_atom::Subs;
 
 impl AtomWithProperties for Subs {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "SubSampleInformationBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "SubSampleInformationBox",
+            vec![
                 (
                     "flags",
                     AtomPropertyValue::from(BasicPropertyValue::Hex(self.flags.to_vec())),
@@ -46,6 +46,6 @@ impl AtomWithProperties for Subs {
                     }),
                 ),
             ],
-        }
+        )
     }
 }

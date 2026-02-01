@@ -3,9 +3,9 @@ use mp4_atom::Styp;
 
 impl AtomWithProperties for Styp {
     fn properties(&self) -> super::AtomProperties {
-        AtomProperties {
-            box_name: "SegmentTypeBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "SegmentTypeBox",
+            vec![
                 ("major_brand", AtomPropertyValue::from(self.major_brand)),
                 ("minor_version", AtomPropertyValue::from(self.minor_version)),
                 (
@@ -13,6 +13,6 @@ impl AtomWithProperties for Styp {
                     AtomPropertyValue::from(&self.compatible_brands),
                 ),
             ],
-        }
+        )
     }
 }

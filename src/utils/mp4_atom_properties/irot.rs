@@ -3,9 +3,9 @@ use mp4_atom::Irot;
 
 impl AtomWithProperties for Irot {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "ImageRotation",
-            properties: vec![("angle", AtomPropertyValue::from(self.angle))],
-        }
+        AtomProperties::from_static_keys(
+            "ImageRotation",
+            vec![("angle", AtomPropertyValue::from(self.angle))],
+        )
     }
 }

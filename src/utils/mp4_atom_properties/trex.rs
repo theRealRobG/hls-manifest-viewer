@@ -3,9 +3,9 @@ use mp4_atom::Trex;
 
 impl AtomWithProperties for Trex {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "TrackExtendsBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "TrackExtendsBox",
+            vec![
                 ("track_id", AtomPropertyValue::from(self.track_id)),
                 (
                     "default_sample_description_index",
@@ -24,6 +24,6 @@ impl AtomWithProperties for Trex {
                     AtomPropertyValue::from(self.default_sample_flags),
                 ),
             ],
-        }
+        )
     }
 }
