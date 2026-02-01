@@ -763,6 +763,15 @@ impl Atom for Dac4 {
                     &mut reader,
                     pres_bytes,
                 )?));
+            } else if presentation_version == 2 {
+                // V2 extension provided by:
+                // https://media.developer.dolby.com/AC4/AC4_DASH_for_BROADCAST_SPEC.pdf
+                presentations.push(Ac4Presentation::V2(ac4_presentation_v1_dsi(
+                    &mut reader,
+                    pres_bytes,
+                )?));
+            } else {
+                presentations.push(Ac4Presentation::UnknownVersion(presentation_version));
             }
             let presentation_bytes =
                 remaining_before_reading_presentation - reader.bytes_remaining();
@@ -828,14 +837,28 @@ impl Display for Ac4BitrateMode {
 pub enum Ac4Presentation {
     V0(Ac4PresentationV0),
     V1(Ac4PresentationV1),
-    Unknown,
+    // V2 extension provided by:
+    // https://media.developer.dolby.com/AC4/AC4_DASH_for_BROADCAST_SPEC.pdf
+    V2(Ac4PresentationV1),
+    UnknownVersion(u8),
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Ac4PresentationV0 {}
+pub struct Ac4PresentationV0 {
+    presentation_config: u8,
+    md_compat: Option<u8>,
+    presentation_id: Option<u8>,
+    dsi_frame_rate_multiply_info: Option<u8>,
+    presentation_emdf_version: Option<u8>,
+    presentation_key_id: Option<u16>,
+    presentation_channel_mask: Option<[u8; 3]>,
+    b_hsf_ext: Option<bool>,
+    substream_groups: Option<Vec<Ac4SubstreamGroup>>,
+    b_pre_virtualized: Option<bool>,
+    emdf_substreams: Vec<EmdfSubstream>,
+}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ac4PresentationV1 {
     presentation_config_v1: u8,
-    // big else block in syntax
     md_compat: Option<u8>,
     presentation_id: Option<u8>,
     dsi_frame_rate_multiply_info: Option<u8>,
@@ -856,7 +879,6 @@ pub struct Ac4PresentationV1 {
     b_multi_pid: Option<bool>,
     substream_groups: Option<Vec<Ac4SubstreamGroup>>,
     b_pre_virtualized: Option<bool>,
-    // end big else block in syntax
     emdf_substreams: Vec<EmdfSubstream>,
     bit_rate_mode: Option<Ac4BitrateMode>,
     bit_rate: Option<u32>,
@@ -867,13 +889,11 @@ pub struct Ac4PresentationV1 {
     extended_presentation_id: Option<u16>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Ac4PresentationV0Substream {}
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ac4SubstreamGroup {
     b_substreams_present: bool,
     b_hsf_ext: bool,
     b_channel_coded: bool,
-    substreams: Vec<Ac4PresentationV1Substream>,
+    substreams: Vec<Ac4PresentationSubstream>,
     content_classifier: Option<Ac4ContentClassifier>,
     language_tag: Option<String>,
 }
@@ -883,7 +903,7 @@ pub struct EmdfSubstream {
     key_id: u16,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Ac4PresentationV1Substream {
+pub struct Ac4PresentationSubstream {
     dsi_sf_multiplier: u8,
     bitrate_indicator: Option<u8>,
     channel_mask: Option<[u8; 3]>,
@@ -928,8 +948,123 @@ pub struct Ac4AlternativeInfoTarget {
     md_compat: u8,
     device_category: u8,
 }
-fn ac4_presentation_v0_dsi(buf: &mut BigEndianReader) -> Result<Ac4PresentationV0> {
-    todo!()
+fn ac4_presentation_v0_dsi(reader: &mut BigEndianReader) -> Result<Ac4PresentationV0> {
+    let presentation_config = reader.read_bits(5).ok_or(READ_ERR)? as u8;
+    let (
+        md_compat,
+        presentation_id,
+        dsi_frame_rate_multiply_info,
+        presentation_emdf_version,
+        presentation_key_id,
+        presentation_channel_mask,
+        b_hsf_ext,
+        substream_groups,
+        b_pre_virtualized,
+        b_add_emdf_substreams,
+    ) = if presentation_config == 0x06 {
+        (None, None, None, None, None, None, None, None, None, true)
+    } else {
+        let md_compat = reader.read_bits(3).ok_or(READ_ERR)? as u8;
+        let b_presentation_id = reader.read_bit().ok_or(READ_ERR)?;
+        let presentation_id = if b_presentation_id {
+            Some(reader.read_bits(5).ok_or(READ_ERR)? as u8)
+        } else {
+            None
+        };
+        let dsi_frame_rate_multiply_info = reader.read_bits(2).ok_or(READ_ERR)? as u8;
+        let presentation_emdf_version = reader.read_bits(5).ok_or(READ_ERR)? as u8;
+        let presentation_key_id = reader.read_bits(10).ok_or(READ_ERR)? as u16;
+        let mut presentation_channel_mask = [0u8; 3];
+        reader
+            .read_bytes(&mut presentation_channel_mask)
+            .then(|| 0)
+            .ok_or(READ_ERR)?;
+        // ETSI TS 103 190-1 v1.4.1 Table E.5a
+        // > This virtual variable shall be considered to be `true` if presentation_config is set to
+        // > 0x1F, otherwise it shall be considered as being `false`.
+        let b_single_substream = presentation_config == 0x1F;
+        let (b_hsf_ext, substream_groups) = if b_single_substream {
+            (None, Some(vec![ac4_substream_group_dsi(reader)?]))
+        } else {
+            let b_hsf_ext = reader.read_bit().ok_or(READ_ERR)?;
+            if [0u8, 1, 2].contains(&presentation_config) {
+                (
+                    Some(b_hsf_ext),
+                    Some(vec![
+                        ac4_substream_group_dsi(reader)?,
+                        ac4_substream_group_dsi(reader)?,
+                    ]),
+                )
+            } else if [3u8, 4].contains(&presentation_config) {
+                (
+                    Some(b_hsf_ext),
+                    Some(vec![
+                        ac4_substream_group_dsi(reader)?,
+                        ac4_substream_group_dsi(reader)?,
+                        ac4_substream_group_dsi(reader)?,
+                    ]),
+                )
+            } else if presentation_config == 5 {
+                let n_substream_groups_minus2 = reader.read_bits(3).ok_or(READ_ERR)? as usize;
+                let n_substream_groups = n_substream_groups_minus2 + 2;
+                let mut substream_groups = Vec::with_capacity(n_substream_groups);
+                for _ in 0..n_substream_groups {
+                    substream_groups.push(ac4_substream_group_dsi(reader)?);
+                }
+                (Some(b_hsf_ext), Some(substream_groups))
+            } else {
+                let n_skip_bytes = reader.read_bits(7).ok_or(READ_ERR)?;
+                for _ in 0..n_skip_bytes {
+                    _ = reader.read_u8().ok_or(READ_ERR)?;
+                }
+                (Some(b_hsf_ext), None)
+            }
+        };
+        let b_pre_virtualized = reader.read_bit().ok_or(READ_ERR)?;
+        let b_add_emdf_substreams = reader.read_bit().ok_or(READ_ERR)?;
+        (
+            Some(md_compat),
+            presentation_id,
+            Some(dsi_frame_rate_multiply_info),
+            Some(presentation_emdf_version),
+            Some(presentation_key_id),
+            Some(presentation_channel_mask),
+            b_hsf_ext,
+            substream_groups,
+            Some(b_pre_virtualized),
+            b_add_emdf_substreams,
+        )
+    };
+    let emdf_substreams = if b_add_emdf_substreams {
+        let n_add_emdf_substreams = reader.read_bits(7).ok_or(READ_ERR)? as usize;
+        let mut emdf_substreams = Vec::with_capacity(n_add_emdf_substreams);
+        for _ in 0..n_add_emdf_substreams {
+            let emdf_version = reader.read_bits(5).ok_or(READ_ERR)? as u8;
+            let key_id = reader.read_bits(10).ok_or(READ_ERR)? as u16;
+            emdf_substreams.push(EmdfSubstream {
+                emdf_version,
+                key_id,
+            });
+        }
+        emdf_substreams
+    } else {
+        Vec::new()
+    };
+    reader.align().map_err(|_| READ_ERR)?;
+
+    Ok(Ac4PresentationV0 {
+        presentation_config,
+        md_compat,
+        presentation_id,
+        dsi_frame_rate_multiply_info,
+        presentation_emdf_version,
+        presentation_key_id,
+        presentation_channel_mask,
+        b_hsf_ext,
+        substream_groups,
+        b_pre_virtualized,
+        emdf_substreams,
+    })
 }
 fn ac4_presentation_v1_dsi(
     reader: &mut BigEndianReader,
@@ -1266,7 +1401,7 @@ fn ac4_substream_group_dsi(reader: &mut BigEndianReader) -> Result<Ac4SubstreamG
                 Some(contains_isf_objects),
             )
         };
-        substreams.push(Ac4PresentationV1Substream {
+        substreams.push(Ac4PresentationSubstream {
             dsi_sf_multiplier,
             bitrate_indicator,
             channel_mask,
@@ -1347,86 +1482,14 @@ impl Atom for Lac4 {
 
 #[cfg(test)]
 mod tests {
-    // Test dac4 atoms found in streams here:
-    // https://ott.dolby.com/OnDelKits/AC-4/Dolby_AC-4_Online_Delivery_Kit_1.5/help_files/topics/kit_wrapper_HLS_multiplexed_streams.html
+    // Test dac4 atoms found here:
+    // https://ott.dolby.com/OnDelKits/AC-4/Dolby_AC-4_Online_Delivery_Kit_1.5/help_files/topics/kit_wrapper_MP4_multiplexed_streams.html
     use super::*;
     use pretty_assertions::assert_eq;
     use std::io::Cursor;
 
     #[test]
     fn dac4_test() {
-        const DAC4: &[u8] = &[
-            0x00, 0x00, 0x00, 0x26, 0x64, 0x61, 0x63, 0x34, 0x20, 0xA6, 0x01, 0x40, 0x00, 0xBA,
-            0xCE, 0xE0, 0x00, 0x02, 0x63, 0x80, 0x01, 0x10, 0xFA, 0x80, 0x00, 0x00, 0x58, 0x80,
-            0x00, 0x1D, 0xFD, 0x40, 0x40, 0x00, 0x03, 0xBC, 0x00, 0x40,
-        ];
-        let mut buf = Cursor::new(DAC4);
-        // Expectation validated with Bento4 mp4dump.
-        assert_eq!(
-            Dac4 {
-                ac4_dsi_version: 1,
-                bitstream_version: 2,
-                fs_index: true,
-                frame_rate_index: 3,
-                short_program_id: None,
-                program_uuid: None,
-                bit_rate_mode: Ac4BitrateMode::Average,
-                bit_rate: 382583,
-                bit_rate_precision: 4892,
-                presentations: vec![Ac4Presentation::V1(Ac4PresentationV1 {
-                    presentation_config_v1: 31,
-                    md_compat: Some(2),
-                    presentation_id: Some(0),
-                    dsi_frame_rate_multiply_info: Some(0),
-                    dsi_frame_rate_fraction_info: Some(0),
-                    presentation_emdf_version: Some(0),
-                    presentation_key_id: Some(0),
-                    b_presentation_channel_coded: Some(true),
-                    dsi_presentation_ch_mode: Some(12),
-                    pres_b_4_back_channels_present: Some(false),
-                    pres_top_channel_pairs: Some(2),
-                    presentation_channel_mask_v1: Some([0, 0, 0b01110111]),
-                    b_presentation_core_differs: Some(true),
-                    b_presentation_core_channel_coded: Some(true),
-                    dsi_presentation_channel_mode_core: Some(3),
-                    b_presentation_filter: Some(false),
-                    b_enable_presentation: None,
-                    filter_data: None,
-                    b_multi_pid: None,
-                    substream_groups: Some(vec![Ac4SubstreamGroup {
-                        b_substreams_present: true,
-                        b_hsf_ext: false,
-                        b_channel_coded: true,
-                        substreams: vec![Ac4PresentationV1Substream {
-                            dsi_sf_multiplier: 0,
-                            bitrate_indicator: None,
-                            channel_mask: Some([0, 0, 0b01110111]),
-                            n_dmx_objects_minus1: None,
-                            n_umx_objects_minus1: None,
-                            contains_bed_objects: None,
-                            contains_dynamic_objects: None,
-                            contains_isf_objects: None,
-                        }],
-                        content_classifier: Some(Ac4ContentClassifier::CompleteMain),
-                        language_tag: None,
-                    }]),
-                    b_pre_virtualized: Some(false),
-                    emdf_substreams: Vec::new(),
-                    bit_rate_mode: None,
-                    bit_rate: None,
-                    bit_rate_precision: None,
-                    alternative_info: None,
-                    de_indicator: Some(false),
-                    immersive_audio_indicator: Some(true),
-                    extended_presentation_id: None,
-                })]
-            },
-            Dac4::decode(&mut buf).expect("dac4 should decode successfully"),
-        )
-    }
-
-    #[test]
-    fn holi_dac_4_test() {
         const DAC4: &[u8] = &[
             0x00, 0x00, 0x00, 0x25, 0x64, 0x61, 0x63, 0x34, 0x20, 0xA6, 0x01, 0x40, 0x00, 0x00,
             0x00, 0x1F, 0xFF, 0xFF, 0xFF, 0xE0, 0x01, 0x0F, 0xF9, 0x80, 0x00, 0x00, 0x48, 0x00,
@@ -1469,7 +1532,7 @@ mod tests {
                         b_substreams_present: true,
                         b_hsf_ext: false,
                         b_channel_coded: true,
-                        substreams: vec![Ac4PresentationV1Substream {
+                        substreams: vec![Ac4PresentationSubstream {
                             dsi_sf_multiplier: 0,
                             bitrate_indicator: None,
                             channel_mask: Some([0, 0, 0b01000111]),
@@ -1492,6 +1555,128 @@ mod tests {
                     immersive_audio_indicator: Some(false),
                     extended_presentation_id: None,
                 })]
+            },
+            Dac4::decode(&mut buf).expect("dac4 should decode successfully"),
+        )
+    }
+
+    #[test]
+    fn dac4_multi_presentation_including_v2() {
+        const DAC4: &[u8] = &[
+            0x00, 0x00, 0x00, 0x36, 0x64, 0x61, 0x63, 0x34, 0x20, 0xA6, 0x02, 0x40, 0x00, 0x00,
+            0x00, 0x1F, 0xFF, 0xFF, 0xFF, 0xE0, 0x02, 0x0F, 0xF8, 0x80, 0x00, 0x00, 0x42, 0x00,
+            0x00, 0x02, 0x50, 0x10, 0x00, 0x00, 0x03, 0x08, 0xC0, 0x01, 0x0F, 0xF8, 0x80, 0x00,
+            0x00, 0x42, 0x00, 0x00, 0x02, 0x50, 0x10, 0x00, 0x00, 0x03, 0x00, 0x80,
+        ];
+        let mut buf = Cursor::new(DAC4);
+        // Validated with https://ott.dolby.com/OnDel_tools/mp4_inspector/index.html
+        assert_eq!(
+            Dac4 {
+                ac4_dsi_version: 1,
+                bitstream_version: 2,
+                fs_index: true,
+                frame_rate_index: 3,
+                short_program_id: None,
+                program_uuid: None,
+                bit_rate_mode: Ac4BitrateMode::Average,
+                bit_rate: 0,
+                bit_rate_precision: 4294967295,
+                presentations: vec![
+                    Ac4Presentation::V2(Ac4PresentationV1 {
+                        presentation_config_v1: 31,
+                        md_compat: Some(0),
+                        presentation_id: Some(0),
+                        dsi_frame_rate_multiply_info: Some(0),
+                        dsi_frame_rate_fraction_info: Some(0),
+                        presentation_emdf_version: Some(0),
+                        presentation_key_id: Some(0),
+                        b_presentation_channel_coded: Some(true),
+                        dsi_presentation_ch_mode: Some(1),
+                        pres_b_4_back_channels_present: None,
+                        pres_top_channel_pairs: None,
+                        presentation_channel_mask_v1: Some([0, 0, 1]),
+                        b_presentation_core_differs: Some(false),
+                        b_presentation_core_channel_coded: None,
+                        dsi_presentation_channel_mode_core: None,
+                        b_presentation_filter: Some(false),
+                        b_enable_presentation: None,
+                        filter_data: None,
+                        b_multi_pid: None,
+                        substream_groups: Some(vec![Ac4SubstreamGroup {
+                            b_substreams_present: true,
+                            b_hsf_ext: false,
+                            b_channel_coded: true,
+                            substreams: vec![Ac4PresentationSubstream {
+                                dsi_sf_multiplier: 0,
+                                bitrate_indicator: None,
+                                channel_mask: Some([0, 0, 1]),
+                                n_dmx_objects_minus1: None,
+                                n_umx_objects_minus1: None,
+                                contains_bed_objects: None,
+                                contains_dynamic_objects: None,
+                                contains_isf_objects: None,
+                            }],
+                            content_classifier: Some(Ac4ContentClassifier::CompleteMain),
+                            language_tag: None,
+                        }]),
+                        b_pre_virtualized: Some(true),
+                        emdf_substreams: Vec::new(),
+                        bit_rate_mode: None,
+                        bit_rate: None,
+                        bit_rate_precision: None,
+                        alternative_info: None,
+                        de_indicator: Some(true),
+                        immersive_audio_indicator: Some(true),
+                        extended_presentation_id: None,
+                    }),
+                    Ac4Presentation::V1(Ac4PresentationV1 {
+                        presentation_config_v1: 31,
+                        md_compat: Some(0),
+                        presentation_id: Some(0),
+                        dsi_frame_rate_multiply_info: Some(0),
+                        dsi_frame_rate_fraction_info: Some(0),
+                        presentation_emdf_version: Some(0),
+                        presentation_key_id: Some(0),
+                        b_presentation_channel_coded: Some(true),
+                        dsi_presentation_ch_mode: Some(1),
+                        pres_b_4_back_channels_present: None,
+                        pres_top_channel_pairs: None,
+                        presentation_channel_mask_v1: Some([0, 0, 1]),
+                        b_presentation_core_differs: Some(false),
+                        b_presentation_core_channel_coded: None,
+                        dsi_presentation_channel_mode_core: None,
+                        b_presentation_filter: Some(false),
+                        b_enable_presentation: None,
+                        filter_data: None,
+                        b_multi_pid: None,
+                        substream_groups: Some(vec![Ac4SubstreamGroup {
+                            b_substreams_present: true,
+                            b_hsf_ext: false,
+                            b_channel_coded: true,
+                            substreams: vec![Ac4PresentationSubstream {
+                                dsi_sf_multiplier: 0,
+                                bitrate_indicator: None,
+                                channel_mask: Some([0, 0, 1]),
+                                n_dmx_objects_minus1: None,
+                                n_umx_objects_minus1: None,
+                                contains_bed_objects: None,
+                                contains_dynamic_objects: None,
+                                contains_isf_objects: None,
+                            }],
+                            content_classifier: Some(Ac4ContentClassifier::CompleteMain),
+                            language_tag: None,
+                        }]),
+                        b_pre_virtualized: Some(false),
+                        emdf_substreams: Vec::new(),
+                        bit_rate_mode: None,
+                        bit_rate: None,
+                        bit_rate_precision: None,
+                        alternative_info: None,
+                        de_indicator: Some(true),
+                        immersive_audio_indicator: Some(false),
+                        extended_presentation_id: None,
+                    })
+                ]
             },
             Dac4::decode(&mut buf).expect("dac4 should decode successfully"),
         )
