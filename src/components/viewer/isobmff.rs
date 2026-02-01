@@ -9,7 +9,7 @@ use leptos::{
     prelude::*,
 };
 use mp4_atom::{Buf, FourCC, Header, ReadFrom};
-use std::io::Cursor;
+use std::{borrow::Cow, io::Cursor};
 use web_sys::MouseEvent;
 
 const ATOMS_CLASS: &str = "mp4-atoms";
@@ -132,7 +132,12 @@ fn AtomInfo(properties: AtomProperties) -> impl IntoView {
                 .map(|(key, value)| {
                     view! {
                         <tr>
-                            <td>{*key}</td>
+                            <td>
+                                {match key {
+                                    Cow::Borrowed(k) => Either::Left(*k),
+                                    Cow::Owned(s) => Either::Right(s.clone()),
+                                }}
+                            </td>
                             <td>
                                 {match value {
                                     AtomPropertyValue::Basic(v) => Either::Left(view_from_prop(v)),

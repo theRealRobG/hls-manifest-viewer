@@ -5,9 +5,9 @@ use mp4_atom::Tx3g;
 
 impl AtomWithProperties for Tx3g {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "3GPP Timed Text",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "3GPP Timed Text",
+            vec![
                 (
                     "data_reference_index",
                     AtomPropertyValue::from(self.data_reference_index),
@@ -46,6 +46,6 @@ impl AtomWithProperties for Tx3g {
                     AtomPropertyValue::from(array_string_from(&self.style_record)),
                 ),
             ],
-        }
+        )
     }
 }

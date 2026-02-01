@@ -11,9 +11,9 @@ use widevine_proto::license_protocol::widevine_pssh_data::{Algorithm, Type};
 
 impl AtomWithProperties for Pssh {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "ProtectionSystemSpecificHeaderBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "ProtectionSystemSpecificHeaderBox",
+            vec![
                 (
                     "system_id",
                     AtomPropertyValue::from(encode_hex(&self.system_id)),
@@ -295,7 +295,7 @@ impl AtomWithProperties for Pssh {
                     },
                 ),
             ],
-        }
+        )
     }
 }
 

@@ -5,9 +5,9 @@ use crate::utils::{
 
 impl AtomWithProperties for Frma {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "OriginalFormatBox",
-            properties: vec![("data_format", AtomPropertyValue::from(self.data_format))],
-        }
+        AtomProperties::from_static_keys(
+            "OriginalFormatBox",
+            vec![("data_format", AtomPropertyValue::from(self.data_format))],
+        )
     }
 }

@@ -3,9 +3,9 @@ use mp4_atom::Clap;
 
 impl AtomWithProperties for Clap {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "CleanApertureBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "CleanApertureBox",
+            vec![
                 (
                     "clean_aperture_width_n",
                     AtomPropertyValue::from(self.clean_aperture_width_n),
@@ -27,6 +27,6 @@ impl AtomWithProperties for Clap {
                 ("vert_off_n", AtomPropertyValue::from(self.vert_off_n)),
                 ("vert_off_d", AtomPropertyValue::from(self.vert_off_d)),
             ],
-        }
+        )
     }
 }

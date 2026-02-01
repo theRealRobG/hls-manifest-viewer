@@ -3,9 +3,9 @@ use mp4_atom::Ccst;
 
 impl AtomWithProperties for Ccst {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "CodingConstraintsBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "CodingConstraintsBox",
+            vec![
                 (
                     "all_ref_pics_intra",
                     AtomPropertyValue::from(self.all_ref_pics_intra),
@@ -19,6 +19,6 @@ impl AtomWithProperties for Ccst {
                     AtomPropertyValue::from(self.max_ref_per_pic),
                 ),
             ],
-        }
+        )
     }
 }

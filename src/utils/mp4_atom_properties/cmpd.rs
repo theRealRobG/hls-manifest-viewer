@@ -5,9 +5,9 @@ use mp4_atom::Cmpd;
 
 impl AtomWithProperties for Cmpd {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "ComponentDefinitionBox",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "ComponentDefinitionBox",
+            vec![(
                 "components",
                 AtomPropertyValue::Table(TablePropertyValue {
                     headers: Some(vec!["type", "type_uri"]),
@@ -23,6 +23,6 @@ impl AtomWithProperties for Cmpd {
                         .collect(),
                 }),
             )],
-        }
+        )
     }
 }

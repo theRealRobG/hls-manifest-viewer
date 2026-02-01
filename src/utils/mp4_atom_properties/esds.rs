@@ -3,9 +3,9 @@ use mp4_atom::Esds;
 
 impl AtomWithProperties for Esds {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "ElementaryStreamDescriptorBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "ElementaryStreamDescriptorBox",
+            vec![
                 ("es_id", AtomPropertyValue::from(self.es_desc.es_id)),
                 (
                     "decoder_config_object_type_indication",
@@ -44,6 +44,6 @@ impl AtomWithProperties for Esds {
                     AtomPropertyValue::from(self.es_desc.dec_config.dec_specific.chan_conf),
                 ),
             ],
-        }
+        )
     }
 }

@@ -54,9 +54,6 @@ impl AtomWithProperties for Tenc {
                 AtomPropertyValue::from(default_skip_byte_block),
             ));
         }
-        AtomProperties {
-            box_name: "TrackEncryptionBox",
-            properties,
-        }
+        AtomProperties::from_static_keys("TrackEncryptionBox", properties)
     }
 }

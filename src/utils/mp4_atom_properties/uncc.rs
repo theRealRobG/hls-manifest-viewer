@@ -5,9 +5,9 @@ use mp4_atom::UncC;
 
 impl AtomWithProperties for UncC {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "UncompressedFrameConfigBox",
-            properties: match self {
+        AtomProperties::from_static_keys(
+            "UncompressedFrameConfigBox",
+            match self {
                 mp4_atom::UncC::V1 { profile } => {
                     vec![("profile", AtomPropertyValue::from(*profile))]
                 }
@@ -78,6 +78,6 @@ impl AtomWithProperties for UncC {
                     ),
                 ],
             },
-        }
+        )
     }
 }

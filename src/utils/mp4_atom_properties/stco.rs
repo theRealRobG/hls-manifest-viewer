@@ -5,12 +5,12 @@ use mp4_atom::Stco;
 
 impl AtomWithProperties for Stco {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "ChunkOffsetBox",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "ChunkOffsetBox",
+            vec![(
                 "entries",
                 AtomPropertyValue::from(array_string_from(&self.entries)),
             )],
-        }
+        )
     }
 }

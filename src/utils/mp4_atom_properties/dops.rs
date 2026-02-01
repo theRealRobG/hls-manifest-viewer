@@ -3,9 +3,9 @@ use mp4_atom::Dops;
 
 impl AtomWithProperties for Dops {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "OpusSpecificBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "OpusSpecificBox",
+            vec![
                 (
                     "output_channel_count",
                     AtomPropertyValue::from(self.output_channel_count),
@@ -17,6 +17,6 @@ impl AtomWithProperties for Dops {
                 ),
                 ("output_gain", AtomPropertyValue::from(self.output_gain)),
             ],
-        }
+        )
     }
 }

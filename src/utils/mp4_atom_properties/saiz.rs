@@ -5,9 +5,9 @@ use mp4_atom::Saiz;
 
 impl AtomWithProperties for Saiz {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "SampleAuxiliaryInformationSizesBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "SampleAuxiliaryInformationSizesBox",
+            vec![
                 (
                     "aux_info_type",
                     AtomPropertyValue::from(self.aux_info.as_ref().map(|a| a.aux_info_type)),
@@ -28,6 +28,6 @@ impl AtomWithProperties for Saiz {
                     AtomPropertyValue::from(array_string_from(&self.sample_info_size)),
                 ),
             ],
-        }
+        )
     }
 }

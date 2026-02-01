@@ -6,9 +6,9 @@ use mp4_atom::Hvcc;
 
 impl AtomWithProperties for Hvcc {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "HEVCConfigurationBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "HEVCConfigurationBox",
+            vec![
                 (
                     "configuration_version",
                     AtomPropertyValue::from(self.configuration_version),
@@ -101,6 +101,6 @@ impl AtomWithProperties for Hvcc {
                     }),
                 ),
             ],
-        }
+        )
     }
 }

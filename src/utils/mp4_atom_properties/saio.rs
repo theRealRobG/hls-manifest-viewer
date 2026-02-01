@@ -5,9 +5,9 @@ use mp4_atom::Saio;
 
 impl AtomWithProperties for Saio {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "SampleAuxiliaryInformationOffsetsBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "SampleAuxiliaryInformationOffsetsBox",
+            vec![
                 (
                     "aux_info_type",
                     AtomPropertyValue::from(self.aux_info.as_ref().map(|a| a.aux_info_type)),
@@ -23,6 +23,6 @@ impl AtomWithProperties for Saio {
                     AtomPropertyValue::from(array_string_from(&self.offsets)),
                 ),
             ],
-        }
+        )
     }
 }

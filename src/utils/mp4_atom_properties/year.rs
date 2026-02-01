@@ -3,9 +3,9 @@ use mp4_atom::Year;
 
 impl AtomWithProperties for Year {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "Year MetadataItem",
-            properties: vec![("year", AtomPropertyValue::from(&self.0))],
-        }
+        AtomProperties::from_static_keys(
+            "Year MetadataItem",
+            vec![("year", AtomPropertyValue::from(&self.0))],
+        )
     }
 }

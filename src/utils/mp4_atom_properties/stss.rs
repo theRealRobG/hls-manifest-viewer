@@ -5,12 +5,12 @@ use mp4_atom::Stss;
 
 impl AtomWithProperties for Stss {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "SyncSampleBox",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "SyncSampleBox",
+            vec![(
                 "entries",
                 AtomPropertyValue::from(array_string_from(&self.entries)),
             )],
-        }
+        )
     }
 }

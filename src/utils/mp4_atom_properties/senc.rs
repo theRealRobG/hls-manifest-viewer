@@ -10,15 +10,14 @@ impl AtomWithProperties for Senc {
     fn properties(&self) -> AtomProperties {
         let box_name = "SampleEncryptionBox";
         if self.entries.is_empty() {
-            return AtomProperties {
+            return AtomProperties::from_static_keys(
                 box_name,
-                properties: vec![("IV", AtomPropertyValue::from("Constant"))],
-            };
+                vec![("IV", AtomPropertyValue::from("Constant"))],
+            );
         }
-        AtomProperties {
+        AtomProperties::from_static_keys(
             box_name,
-            properties: self
-                .entries
+            self.entries
                 .iter()
                 .enumerate()
                 .map(|(i, entry)| {
@@ -47,6 +46,6 @@ impl AtomWithProperties for Senc {
                     )
                 })
                 .collect(),
-        }
+        )
     }
 }

@@ -5,9 +5,9 @@ use mp4_atom::Mvhd;
 
 impl AtomWithProperties for Mvhd {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "MovieHeaderBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "MovieHeaderBox",
+            vec![
                 ("creation_time", AtomPropertyValue::from(self.creation_time)),
                 (
                     "modification_time",
@@ -45,6 +45,6 @@ impl AtomWithProperties for Mvhd {
                 ),
                 ("next_track_id", AtomPropertyValue::from(self.next_track_id)),
             ],
-        }
+        )
     }
 }

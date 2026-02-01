@@ -5,9 +5,9 @@ use crate::utils::{
 
 impl AtomWithProperties for Prft {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "ProducerReferenceTimeBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "ProducerReferenceTimeBox",
+            vec![
                 (
                     "reference_track_id",
                     AtomPropertyValue::from(self.reference_track_id),
@@ -22,6 +22,6 @@ impl AtomWithProperties for Prft {
                     )),
                 ),
             ],
-        }
+        )
     }
 }

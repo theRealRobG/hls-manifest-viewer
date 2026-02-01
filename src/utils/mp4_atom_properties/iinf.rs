@@ -5,9 +5,9 @@ use mp4_atom::Iinf;
 
 impl AtomWithProperties for Iinf {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "ItemInfoBox",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "ItemInfoBox",
+            vec![(
                 "item_infos",
                 AtomPropertyValue::Table(TablePropertyValue {
                     headers: Some(vec![
@@ -36,6 +36,6 @@ impl AtomWithProperties for Iinf {
                         .collect(),
                 }),
             )],
-        }
+        )
     }
 }

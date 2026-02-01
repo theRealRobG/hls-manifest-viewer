@@ -6,9 +6,9 @@ use mp4_atom::Avcc;
 
 impl AtomWithProperties for Avcc {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "AVCConfigurationBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "AVCConfigurationBox",
+            vec![
                 (
                     "configuration_version",
                     AtomPropertyValue::from(self.configuration_version),
@@ -79,6 +79,6 @@ impl AtomWithProperties for Avcc {
                         ))),
                 ),
             ],
-        }
+        )
     }
 }

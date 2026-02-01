@@ -3,9 +3,9 @@ use mp4_atom::Ftyp;
 
 impl AtomWithProperties for Ftyp {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "FileTypeBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "FileTypeBox",
+            vec![
                 ("major_brand", AtomPropertyValue::from(self.major_brand)),
                 ("minor_version", AtomPropertyValue::from(self.minor_version)),
                 (
@@ -13,6 +13,6 @@ impl AtomWithProperties for Ftyp {
                     AtomPropertyValue::from(&self.compatible_brands),
                 ),
             ],
-        }
+        )
     }
 }

@@ -3,12 +3,12 @@ use mp4_atom::Tfdt;
 
 impl AtomWithProperties for Tfdt {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "TrackFragmentBaseMediaDecodeTimeBox",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "TrackFragmentBaseMediaDecodeTimeBox",
+            vec![(
                 "base_media_decode_time",
                 AtomPropertyValue::from(self.base_media_decode_time),
             )],
-        }
+        )
     }
 }

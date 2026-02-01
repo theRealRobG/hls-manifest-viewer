@@ -3,9 +3,9 @@ use mp4_atom::Tfhd;
 
 impl AtomWithProperties for Tfhd {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "TrackFragmentHeaderBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "TrackFragmentHeaderBox",
+            vec![
                 ("track_id", AtomPropertyValue::from(self.track_id)),
                 (
                     "base_data_offset",
@@ -28,6 +28,6 @@ impl AtomWithProperties for Tfhd {
                     AtomPropertyValue::from(self.default_sample_flags),
                 ),
             ],
-        }
+        )
     }
 }

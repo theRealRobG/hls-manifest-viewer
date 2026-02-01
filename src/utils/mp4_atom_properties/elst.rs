@@ -5,9 +5,9 @@ use mp4_atom::Elst;
 
 impl AtomWithProperties for Elst {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "EditListBox",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "EditListBox",
+            vec![(
                 "entries",
                 AtomPropertyValue::Table(TablePropertyValue {
                     headers: Some(vec![
@@ -30,6 +30,6 @@ impl AtomWithProperties for Elst {
                         .collect(),
                 }),
             )],
-        }
+        )
     }
 }

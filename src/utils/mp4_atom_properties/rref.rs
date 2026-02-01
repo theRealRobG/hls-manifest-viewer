@@ -3,12 +3,12 @@ use mp4_atom::Rref;
 
 impl AtomWithProperties for Rref {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "RequiredReferenceTypesProperty",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "RequiredReferenceTypesProperty",
+            vec![(
                 "reference_types",
                 AtomPropertyValue::from(&self.reference_types),
             )],
-        }
+        )
     }
 }

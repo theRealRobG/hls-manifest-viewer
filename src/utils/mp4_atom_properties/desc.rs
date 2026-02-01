@@ -3,9 +3,9 @@ use mp4_atom::Desc;
 
 impl AtomWithProperties for Desc {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "Desc MetadataItem",
-            properties: vec![("desc", AtomPropertyValue::from(&self.0))],
-        }
+        AtomProperties::from_static_keys(
+            "Desc MetadataItem",
+            vec![("desc", AtomPropertyValue::from(&self.0))],
+        )
     }
 }

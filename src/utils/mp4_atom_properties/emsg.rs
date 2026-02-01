@@ -35,9 +35,9 @@ impl AtomWithProperties for Emsg {
         } else {
             AtomPropertyValue::from(String::from_utf8_lossy(&self.message_data).to_string())
         };
-        AtomProperties {
-            box_name: "EventMessageBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "EventMessageBox",
+            vec![
                 ("timescale", AtomPropertyValue::from(self.timescale)),
                 match self.presentation_time {
                     mp4_atom::EmsgTimestamp::Relative(t) => {
@@ -59,6 +59,6 @@ impl AtomWithProperties for Emsg {
                 ("value", AtomPropertyValue::from(&self.value)),
                 ("message_data", message_data),
             ],
-        }
+        )
     }
 }

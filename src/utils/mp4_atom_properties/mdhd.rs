@@ -3,9 +3,9 @@ use mp4_atom::Mdhd;
 
 impl AtomWithProperties for Mdhd {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "MediaHeaderBox",
-            properties: vec![
+        AtomProperties::from_static_keys(
+            "MediaHeaderBox",
+            vec![
                 ("creation_time", AtomPropertyValue::from(self.creation_time)),
                 (
                     "modification_time",
@@ -15,6 +15,6 @@ impl AtomWithProperties for Mdhd {
                 ("duration", AtomPropertyValue::from(self.duration)),
                 ("language", AtomPropertyValue::from(&self.language)),
             ],
-        }
+        )
     }
 }

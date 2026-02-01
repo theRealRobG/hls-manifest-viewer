@@ -5,9 +5,9 @@ use mp4_atom::Iloc;
 
 impl AtomWithProperties for Iloc {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "ItemLocationBox",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "ItemLocationBox",
+            vec![(
                 "item_locations",
                 AtomPropertyValue::Table(TablePropertyValue {
                     headers: Some(vec![
@@ -43,6 +43,6 @@ impl AtomWithProperties for Iloc {
                         .collect(),
                 }),
             )],
-        }
+        )
     }
 }

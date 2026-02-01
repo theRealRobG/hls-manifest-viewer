@@ -5,9 +5,9 @@ use mp4_atom::Stsc;
 
 impl AtomWithProperties for Stsc {
     fn properties(&self) -> AtomProperties {
-        AtomProperties {
-            box_name: "SampleToChunkBox",
-            properties: vec![(
+        AtomProperties::from_static_keys(
+            "SampleToChunkBox",
+            vec![(
                 "entries",
                 AtomPropertyValue::Table(TablePropertyValue {
                     headers: Some(vec![
@@ -28,6 +28,6 @@ impl AtomWithProperties for Stsc {
                         .collect(),
                 }),
             )],
-        }
+        )
     }
 }
