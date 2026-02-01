@@ -1,6 +1,6 @@
 use crate::utils::{
-    mp4::Colr,
     mp4_atom_properties::{AtomProperties, AtomPropertyValue, AtomWithProperties},
+    mp4_parsing::Colr,
 };
 
 impl AtomWithProperties for Colr {
