@@ -13,6 +13,7 @@ mod co64;
 mod colr;
 mod covr;
 mod ctts;
+mod dac4;
 mod desc;
 mod dops;
 mod dref;
@@ -121,10 +122,15 @@ pub enum BasicPropertyValue {
     Usize(usize),
     Bool(bool),
     Hex(Vec<u8>),
+    BinaryMask(Vec<u8>),
 }
 impl BasicPropertyValue {
     pub fn is_hex(&self) -> bool {
         matches!(self, Self::Hex(_))
+    }
+
+    pub fn is_binary_mask(&self) -> bool {
+        matches!(self, Self::BinaryMask(_))
     }
 }
 impl From<&BasicPropertyValue> for String {
@@ -166,6 +172,11 @@ impl From<&BasicPropertyValue> for String {
                 }
                 rows.join("\n")
             }
+            BasicPropertyValue::BinaryMask(bytes) => bytes
+                .iter()
+                .map(|b| format!("{b:08b}"))
+                .collect::<Vec<String>>()
+                .join(" "),
         }
     }
 }
@@ -459,6 +470,7 @@ pub fn get_properties(
         Pssh::KIND => try_properties_from::<Pssh>(header, reader),
         Tenc::KIND => try_properties_from::<Tenc>(header, reader),
         Lac4::KIND => try_properties_from::<Lac4>(header, reader),
+        Dac4::KIND => try_properties_from::<Dac4>(header, reader),
         // Overriding implementation from mp4-atom to add unknown case and nclc case defined in
         // QuickTime File Format.
         Colr::KIND => try_properties_from::<Colr>(header, reader),
