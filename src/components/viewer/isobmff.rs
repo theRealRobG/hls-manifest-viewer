@@ -206,7 +206,7 @@ fn view_from_prop(
     property: &BasicPropertyValue,
 ) -> Either<View<leptos::html::HtmlElement<leptos::html::Pre, (), (String,)>>, String> {
     let string = String::from(property);
-    if property.is_hex() {
+    if property.is_hex() || property.is_binary_mask() {
         Either::Left(view! { <pre>{string}</pre> })
     } else {
         Either::Right(view! { {string} })

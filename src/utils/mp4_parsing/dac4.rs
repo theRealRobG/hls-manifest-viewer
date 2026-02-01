@@ -1,21 +1,20 @@
 use crate::utils::bitter::ByteAlign;
 use bitter::{BigEndianReader, BitReader};
 use mp4_atom::{Atom, Buf, BufMut, FourCC, Result};
-use std::fmt::Display;
 
 /// AC4SpecificBox, ETSI TS 103 190-2 V1.2.1 (2018-02) Sect E.5.1
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Dac4 {
-    ac4_dsi_version: u8,
-    bitstream_version: u8,
-    fs_index: bool,
-    frame_rate_index: u8,
-    short_program_id: Option<u16>,
-    program_uuid: Option<[u8; 16]>,
-    bit_rate_mode: Ac4BitrateMode,
-    bit_rate: u32,
-    bit_rate_precision: u32,
-    presentations: Vec<Ac4Presentation>,
+    pub ac4_dsi_version: u8,
+    pub bitstream_version: u8,
+    pub fs_index: bool,
+    pub frame_rate_index: u8,
+    pub short_program_id: Option<u16>,
+    pub program_uuid: Option<[u8; 16]>,
+    pub bit_rate_mode: Ac4BitrateMode,
+    pub bit_rate: u32,
+    pub bit_rate_precision: u32,
+    pub presentations: Vec<Ac4Presentation>,
 }
 const READ_ERR: mp4_atom::Error = mp4_atom::Error::OutOfBounds;
 impl Atom for Dac4 {
@@ -130,16 +129,6 @@ impl From<u8> for Ac4BitrateMode {
         }
     }
 }
-impl Display for Ac4BitrateMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NotSpecified => write!(f, "not specified"),
-            Self::Constant => write!(f, "constant"),
-            Self::Average => write!(f, "average"),
-            Self::Variable => write!(f, "variable"),
-        }
-    }
-}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ac4Presentation {
     V0(Ac4PresentationV0),
@@ -151,74 +140,74 @@ pub enum Ac4Presentation {
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ac4PresentationV0 {
-    presentation_config: u8,
-    md_compat: Option<u8>,
-    presentation_id: Option<u8>,
-    dsi_frame_rate_multiply_info: Option<u8>,
-    presentation_emdf_version: Option<u8>,
-    presentation_key_id: Option<u16>,
-    presentation_channel_mask: Option<[u8; 3]>,
-    b_hsf_ext: Option<bool>,
-    substream_groups: Option<Vec<Ac4SubstreamGroup>>,
-    b_pre_virtualized: Option<bool>,
-    emdf_substreams: Vec<EmdfSubstream>,
+    pub presentation_config: u8,
+    pub md_compat: Option<u8>,
+    pub presentation_id: Option<u8>,
+    pub dsi_frame_rate_multiply_info: Option<u8>,
+    pub presentation_emdf_version: Option<u8>,
+    pub presentation_key_id: Option<u16>,
+    pub presentation_channel_mask: Option<[u8; 3]>,
+    pub b_hsf_ext: Option<bool>,
+    pub substream_groups: Option<Vec<Ac4SubstreamGroup>>,
+    pub b_pre_virtualized: Option<bool>,
+    pub emdf_substreams: Vec<EmdfSubstream>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ac4PresentationV1 {
-    presentation_config_v1: u8,
-    md_compat: Option<u8>,
-    presentation_id: Option<u8>,
-    dsi_frame_rate_multiply_info: Option<u8>,
-    dsi_frame_rate_fraction_info: Option<u8>,
-    presentation_emdf_version: Option<u8>,
-    presentation_key_id: Option<u16>,
-    b_presentation_channel_coded: Option<bool>,
-    dsi_presentation_ch_mode: Option<u8>,
-    pres_b_4_back_channels_present: Option<bool>,
-    pres_top_channel_pairs: Option<u8>,
-    presentation_channel_mask_v1: Option<[u8; 3]>,
-    b_presentation_core_differs: Option<bool>,
-    b_presentation_core_channel_coded: Option<bool>,
-    dsi_presentation_channel_mode_core: Option<u8>,
-    b_presentation_filter: Option<bool>,
-    b_enable_presentation: Option<bool>,
-    filter_data: Option<Vec<u8>>,
-    b_multi_pid: Option<bool>,
-    substream_groups: Option<Vec<Ac4SubstreamGroup>>,
-    b_pre_virtualized: Option<bool>,
-    emdf_substreams: Vec<EmdfSubstream>,
-    bit_rate_mode: Option<Ac4BitrateMode>,
-    bit_rate: Option<u32>,
-    bit_rate_precision: Option<u32>,
-    alternative_info: Option<Ac4AlternativeInfo>,
-    de_indicator: Option<bool>,
-    immersive_audio_indicator: Option<bool>,
-    extended_presentation_id: Option<u16>,
+    pub presentation_config_v1: u8,
+    pub md_compat: Option<u8>,
+    pub presentation_id: Option<u8>,
+    pub dsi_frame_rate_multiply_info: Option<u8>,
+    pub dsi_frame_rate_fraction_info: Option<u8>,
+    pub presentation_emdf_version: Option<u8>,
+    pub presentation_key_id: Option<u16>,
+    pub b_presentation_channel_coded: Option<bool>,
+    pub dsi_presentation_ch_mode: Option<u8>,
+    pub pres_b_4_back_channels_present: Option<bool>,
+    pub pres_top_channel_pairs: Option<u8>,
+    pub presentation_channel_mask_v1: Option<[u8; 3]>,
+    pub b_presentation_core_differs: Option<bool>,
+    pub b_presentation_core_channel_coded: Option<bool>,
+    pub dsi_presentation_channel_mode_core: Option<u8>,
+    pub b_presentation_filter: Option<bool>,
+    pub b_enable_presentation: Option<bool>,
+    pub filter_data: Option<Vec<u8>>,
+    pub b_multi_pid: Option<bool>,
+    pub substream_groups: Option<Vec<Ac4SubstreamGroup>>,
+    pub b_pre_virtualized: Option<bool>,
+    pub emdf_substreams: Vec<EmdfSubstream>,
+    pub bit_rate_mode: Option<Ac4BitrateMode>,
+    pub bit_rate: Option<u32>,
+    pub bit_rate_precision: Option<u32>,
+    pub alternative_info: Option<Ac4AlternativeInfo>,
+    pub de_indicator: Option<bool>,
+    pub immersive_audio_indicator: Option<bool>,
+    pub extended_presentation_id: Option<u16>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ac4SubstreamGroup {
-    b_substreams_present: bool,
-    b_hsf_ext: bool,
-    b_channel_coded: bool,
-    substreams: Vec<Ac4PresentationSubstream>,
-    content_classifier: Option<Ac4ContentClassifier>,
-    language_tag: Option<String>,
+    pub b_substreams_present: bool,
+    pub b_hsf_ext: bool,
+    pub b_channel_coded: bool,
+    pub substreams: Vec<Ac4PresentationSubstream>,
+    pub content_classifier: Option<Ac4ContentClassifier>,
+    pub language_tag: Option<String>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EmdfSubstream {
-    emdf_version: u8,
-    key_id: u16,
+    pub emdf_version: u8,
+    pub key_id: u16,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ac4PresentationSubstream {
-    dsi_sf_multiplier: u8,
-    bitrate_indicator: Option<u8>,
-    channel_mask: Option<[u8; 3]>,
-    n_dmx_objects_minus1: Option<u8>,
-    n_umx_objects_minus1: Option<u8>,
-    contains_bed_objects: Option<bool>,
-    contains_dynamic_objects: Option<bool>,
-    contains_isf_objects: Option<bool>,
+    pub dsi_sf_multiplier: u8,
+    pub bitrate_indicator: Option<u8>,
+    pub channel_mask: Option<[u8; 3]>,
+    pub n_dmx_objects_minus1: Option<u8>,
+    pub n_umx_objects_minus1: Option<u8>,
+    pub contains_bed_objects: Option<bool>,
+    pub contains_dynamic_objects: Option<bool>,
+    pub contains_isf_objects: Option<bool>,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Ac4ContentClassifier {
@@ -247,13 +236,13 @@ impl From<u8> for Ac4ContentClassifier {
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ac4AlternativeInfo {
-    presentation_name: String,
-    targets: Vec<Ac4AlternativeInfoTarget>,
+    pub presentation_name: String,
+    pub targets: Vec<Ac4AlternativeInfoTarget>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ac4AlternativeInfoTarget {
-    md_compat: u8,
-    device_category: u8,
+    pub md_compat: u8,
+    pub device_category: u8,
 }
 fn ac4_presentation_v0_dsi(reader: &mut BigEndianReader) -> Result<Ac4PresentationV0> {
     let presentation_config = reader.read_bits(5).ok_or(READ_ERR)? as u8;
