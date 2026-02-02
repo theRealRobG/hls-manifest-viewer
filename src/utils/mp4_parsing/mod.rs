@@ -1,4 +1,5 @@
 pub mod colr;
+pub mod dac3;
 pub mod dac4;
 pub mod frma;
 pub mod lac4;
@@ -9,6 +10,7 @@ pub mod senc;
 pub mod tenc;
 
 pub use colr::Colr;
+pub use dac3::Dac3;
 pub use dac4::Dac4;
 pub use frma::Frma;
 pub use lac4::Lac4;

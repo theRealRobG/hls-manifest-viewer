@@ -1,4 +1,4 @@
-use crate::utils::mp4_parsing::{Colr, Dac4, Frma, Lac4, Prft, Pssh, Schm, Senc, Tenc};
+use crate::utils::mp4_parsing::{Colr, Dac3, Dac4, Frma, Lac4, Prft, Pssh, Schm, Senc, Tenc};
 use mp4_atom::{Any, Atom, Audio, Buf, Decode, DecodeAtom, FourCC, Header, Visual};
 use std::{borrow::Cow, fmt::Display, io::Cursor};
 
@@ -13,6 +13,7 @@ mod co64;
 mod colr;
 mod covr;
 mod ctts;
+mod dac3;
 mod dac4;
 mod desc;
 mod dops;
@@ -440,6 +441,9 @@ pub fn get_properties(
         }
         mp4_atom::Mp4a::KIND => audio_entry(header, "MP4AudioSampleEntryBox", reader),
         mp4_atom::Opus::KIND => audio_entry(header, "OpusSampleEntryBox", reader),
+        four_cc if four_cc == FourCC::new(b"ac-3") => {
+            audio_entry(header, "AC3SampleEntryBox", reader)
+        }
         four_cc if four_cc == FourCC::new(b"ac-4") => {
             audio_entry(header, "AC4SampleEntryBox", reader)
         }
@@ -469,6 +473,7 @@ pub fn get_properties(
         Schm::KIND => try_properties_from::<Schm>(header, reader),
         Pssh::KIND => try_properties_from::<Pssh>(header, reader),
         Tenc::KIND => try_properties_from::<Tenc>(header, reader),
+        Dac3::KIND => try_properties_from::<Dac3>(header, reader),
         Lac4::KIND => try_properties_from::<Lac4>(header, reader),
         Dac4::KIND => try_properties_from::<Dac4>(header, reader),
         // Overriding implementation from mp4-atom to add unknown case and nclc case defined in
