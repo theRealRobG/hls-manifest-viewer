@@ -15,7 +15,7 @@ use std::{borrow::Cow, fmt::Display};
 
 impl AtomWithProperties for Dac4 {
     fn properties(&self) -> AtomProperties {
-        let box_name = "";
+        let box_name = "AC4SpecificBox";
         let mut properties = Vec::new();
 
         properties.push((
