@@ -404,31 +404,31 @@ fn x_daterange(tag: &UnknownTag, state: &mut ParsingState) {
             }
         },
         |name, _| {
-            let scte35_highlight = state
-                .highlighted_scte35_info
-                .as_ref()
-                .and_then(|info| {
-                    id.as_ref().and_then(|id| {
-                        if id == &info.daterange_id {
-                            match info.command_type {
-                                Scte35CommandType::Cmd => Some(name == "SCTE35-CMD"),
-                                Scte35CommandType::Out => Some(name == "SCTE35-OUT"),
-                                Scte35CommandType::In => Some(name == "SCTE35-IN"),
+            match name {
+                "SCTE35-CMD" | "SCTE35-OUT" | "SCTE35-IN" => state
+                    .highlighted_scte35_info
+                    .as_ref()
+                    .and_then(|info| {
+                        id.as_ref().and_then(|id| {
+                            if id == &info.daterange_id {
+                                match info.command_type {
+                                    Scte35CommandType::Cmd => Some(name == "SCTE35-CMD"),
+                                    Scte35CommandType::Out => Some(name == "SCTE35-OUT"),
+                                    Scte35CommandType::In => Some(name == "SCTE35-IN"),
+                                }
+                            } else {
+                                None
                             }
-                        } else {
-                            None
-                        }
+                        })
                     })
-                })
-                .unwrap_or(false);
-
-            let asset_list_highlight = state
-                .highlighted_asset_list_daterange_id
-                .as_ref()
-                .map(|highlighted_id| id.as_ref() == Some(highlighted_id))
-                .unwrap_or(false);
-
-            scte35_highlight || asset_list_highlight
+                    .unwrap_or(false),
+                "X-ASSET-LIST" => state
+                    .highlighted_asset_list_daterange_id
+                    .as_ref()
+                    .map(|highlighted_id| id.as_ref() == Some(highlighted_id))
+                    .unwrap_or(false),
+                _ => false,
+            }
         },
     );
     state.lines.push(view_from_markup(markup));
