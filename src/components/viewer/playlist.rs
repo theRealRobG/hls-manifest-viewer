@@ -6,8 +6,7 @@ use crate::{
     components::CopyButton,
     utils::{
         href::{
-            asset_list_href, map_href, media_playlist_href, part_href,
-            resolve_playlist_relative_url, scte35_href, segment_href,
+            asset_list_href, daterange_schedule_href, map_href, media_playlist_href, part_href, resolve_playlist_relative_url, scte35_href, segment_href
         },
         network::RequestRange,
         query_codec::Scte35CommandType,
@@ -53,6 +52,9 @@ pub enum Highlighted {
     AssetList {
         daterange_id: String,
     },
+    XUri {
+        daterange_id: String,
+    }
 }
 
 pub struct HighlightedMapInfo {
@@ -363,18 +365,20 @@ fn x_part(tag: &UnknownTag, state: &mut ParsingState) {
 }
 
 fn x_daterange(tag: &UnknownTag, state: &mut ParsingState) {
-    let id = tag
-        .value()
-        .and_then(|v| v.try_as_ordered_attribute_list().ok())
-        .and_then(|v| {
-            v.iter().find_map(|(name, value)| {
-                if *name == "ID" {
-                    value.quoted().map(String::from)
-                } else {
-                    None
-                }
-            })
-        });
+    let mut id = None;
+    let mut class = None;
+    let mut target_class = None;
+    if let Some(attribute_list) = tag.value().and_then(|v| v.try_as_ordered_attribute_list().ok()) {
+        for (name, value) in attribute_list {
+            if name == "ID" {
+                id = value.quoted().map(String::from);
+            } else if name == "CLASS" {
+                class = value.quoted().map(String::from);
+            } else if name == "X-TARGET-CLASS" {
+                target_class = value.quoted().map(String::from);
+            }
+        }
+    }
     let markup = split_tag_as_markup(
         tag,
         [
@@ -383,6 +387,7 @@ fn x_daterange(tag: &UnknownTag, state: &mut ParsingState) {
             "SCTE35-CMD",
             "X-ASSET-URI",
             "X-ASSET-LIST",
+            "X-URI",
         ],
         |name, value| match name {
             "SCTE35-OUT" => id
@@ -398,6 +403,29 @@ fn x_daterange(tag: &UnknownTag, state: &mut ParsingState) {
             "X-ASSET-LIST" => id
                 .as_ref()
                 .and_then(|id| asset_list_href(value, id, &state.local_definitions)),
+            "X-URI" if class.as_ref().is_some_and(|c| c == "com.apple.hls.preload") => id
+                .as_ref()
+                .and_then(|id| {
+                    let Some(target_class) = &target_class else {
+                        return None;
+                    };
+                    if target_class == "com.apple.hls.interstitial" {
+                        match guess_interstitial_type_from_uri(value) {
+                            Some(InterstitialType::AssetList) =>
+                                asset_list_href(value, id, &state.local_definitions),
+                            Some(InterstitialType::Uri) =>
+                                media_playlist_href(value, &state.local_definitions),
+                            None => None,
+                        }
+                    } else if target_class == "com.apple.hls.daterange-schedule" {
+                        daterange_schedule_href(value, id, &state.local_definitions)
+                    } else {
+                        None
+                    }
+                }),
+            "X-URI" if class.as_ref().is_some_and(|c| c == "com.apple.hls.daterange-schedule") => id
+                .as_ref()
+                .and_then(|id| daterange_schedule_href(value, id, &state.local_definitions)),
             _ => {
                 log::error!("unexpected SCTE35 attribute on daterange: {name}");
                 None
@@ -427,6 +455,11 @@ fn x_daterange(tag: &UnknownTag, state: &mut ParsingState) {
                     .as_ref()
                     .map(|highlighted_id| id.as_ref() == Some(highlighted_id))
                     .unwrap_or(false),
+                "X-URI" => state
+                    .highlighted_x_uri_daterange_id
+                    .as_ref()
+                    .map(|highlighted_id| id.as_ref() == Some(highlighted_id))
+                    .unwrap_or(false),
                 _ => false,
             }
         },
@@ -451,6 +484,23 @@ fn resolve_href(opts: ResolveOptions) -> Option<String> {
         UriType::Part { part_index } => {
             part_href(uri, media_sequence, part_index, byterange, definitions)
         }
+    }
+}
+
+enum InterstitialType {
+    Uri,
+    AssetList,
+}
+fn guess_interstitial_type_from_uri(uri: &str) -> Option<InterstitialType> {
+    let before_query = uri.splitn(2, '?').next()?;
+    let last_path = before_query.split('/').next_back()?;
+    let extension = last_path.split('.').next_back()?;
+    if extension.eq_ignore_ascii_case("m3u8") {
+        Some(InterstitialType::Uri)
+    } else if extension.eq_ignore_ascii_case("json") {
+        Some(InterstitialType::AssetList)
+    } else {
+        None
     }
 }
 
@@ -599,6 +649,7 @@ struct ParsingState {
     highlighted_part_info: Option<HighlightedPartInfo>,
     highlighted_scte35_info: Option<HighlightedScte35Info>,
     highlighted_asset_list_daterange_id: Option<String>,
+    highlighted_x_uri_daterange_id: Option<String>,
     // Constructed by default
     lines: Vec<AnyView>,
     media_sequence: u64,
@@ -621,9 +672,13 @@ impl ParsingState {
             highlighted_part_info,
             highlighted_scte35_info,
             highlighted_asset_list_daterange_id,
+            highlighted_x_uri_daterange_id,
         ) = match highlighted {
             Some(Highlighted::AssetList { daterange_id }) => {
-                (None, None, None, None, Some(daterange_id))
+                (None, None, None, None, Some(daterange_id), None)
+            }
+            Some(Highlighted::XUri { daterange_id }) => {
+                (None, None, None, None, None, Some(daterange_id))
             }
             Some(Highlighted::Map {
                 url,
@@ -634,6 +689,7 @@ impl ParsingState {
                     url,
                     min_media_sequence,
                 }),
+                None,
                 None,
                 None,
                 None,
@@ -650,6 +706,7 @@ impl ParsingState {
                 }),
                 None,
                 None,
+                None,
             ),
             Some(Highlighted::Scte35 {
                 daterange_id,
@@ -663,11 +720,12 @@ impl ParsingState {
                     command_type,
                 }),
                 None,
+                None,
             ),
             Some(Highlighted::Segment { media_sequence }) => {
-                (Some(media_sequence), None, None, None, None)
+                (Some(media_sequence), None, None, None, None, None)
             }
-            None => (None, None, None, None, None),
+            None => (None, None, None, None, None, None),
         };
         Self {
             imported_definitions,
@@ -676,6 +734,7 @@ impl ParsingState {
             highlighted_part_info,
             highlighted_scte35_info,
             highlighted_asset_list_daterange_id,
+            highlighted_x_uri_daterange_id,
             lines: Default::default(),
             media_sequence: Default::default(),
             part_index: Default::default(),

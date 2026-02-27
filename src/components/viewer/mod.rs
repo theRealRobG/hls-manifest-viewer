@@ -1,4 +1,5 @@
 mod asset_list;
+mod daterange_schedule;
 mod error;
 mod isobmff;
 mod loading;
@@ -6,12 +7,16 @@ mod playlist;
 mod preformatted;
 mod scte35;
 
-use crate::utils::{
-    network::{fetch_array_buffer, fetch_text, FetchError, FetchTextResponse, RequestRange},
-    query_codec::{
-        AssetListContext, MediaSegmentContext, PartSegmentContext, SupplementalViewQueryContext,
+use crate::{
+    components::viewer::daterange_schedule::DaterangeScheduleView,
+    utils::{
+        network::{fetch_array_buffer, fetch_text, FetchError, FetchTextResponse, RequestRange},
+        query_codec::{
+            AssetListContext, DaterangeScheduleContext, MediaSegmentContext, PartSegmentContext,
+            SupplementalViewQueryContext,
+        },
+        response::{determine_segment_type, SegmentType},
     },
-    response::{determine_segment_type, SegmentType},
 };
 use asset_list::AssetListView;
 use error::ViewerError;
@@ -102,7 +107,29 @@ pub fn Viewer(
                             }
                         />
                     </ErrorBounded>
-                    <LoadingAssetListView asset_list_url=url />
+                    <FetchTextView
+                        url=url
+                        render_text=|text| view! { <AssetListView json=text /> }
+                    />
+                </Container>
+            }
+        }
+        SupplementalViewQueryContext::DaterangeSchedule(daterange_schedule_context) => {
+            let DaterangeScheduleContext { url, daterange_id } = daterange_schedule_context;
+            view! {
+                <Container>
+                    <ErrorBounded>
+                        <PlaylistViewer
+                            playlist
+                            imported_definitions
+                            supplemental_showing=true
+                            highlighted=Highlighted::XUri { daterange_id }
+                        />
+                    </ErrorBounded>
+                    <FetchTextView
+                        url=url
+                        render_text=|text| view! { <DaterangeScheduleView json=text /> }
+                    />
                 </Container>
             }
         }
@@ -282,21 +309,23 @@ fn SupplementalSegmentView(segment_url: String, byterange: Option<RequestRange>)
 }
 
 #[component]
-fn LoadingAssetListView(asset_list_url: String) -> impl IntoView {
-    let asset_list_result = LocalResource::new(move || fetch_text(asset_list_url.clone()));
+fn FetchTextView<F, IV>(url: String, render_text: F) -> impl IntoView
+where
+    F: Fn(String) -> IV + Send + 'static,
+    IV: IntoView + 'static,
+{
+    let text_result = LocalResource::new(move || fetch_text(url.clone()));
     view! {
         <Suspense fallback=|| {
             view! { <div class=SUPPLEMENTAL_VIEW_CLASS>"LOADING..."</div> }
         }>
             <ErrorBounded>
                 {move || {
-                    asset_list_result
+                    text_result
                         .get()
                         .map(|fetch_response| {
                             match fetch_response {
-                                Ok(r) => {
-                                    Either::Left(view! { <AssetListView json=r.response_text /> })
-                                }
+                                Ok(r) => Either::Left(render_text(r.response_text)),
                                 Err(e) => {
                                     Either::Right(
                                         view! {

@@ -1,9 +1,8 @@
-use std::collections::HashMap;
-
 use super::{SPACER_BOTTOM, SUPPLEMENTAL_VIEW_CLASS, UNDERLINED, URI_CLASS};
 use crate::{components::viewer::error::ViewerError, utils::href::media_playlist_href};
 use leptos::{either::Either, prelude::*};
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[component]
 pub fn AssetListView(json: String) -> impl IntoView {

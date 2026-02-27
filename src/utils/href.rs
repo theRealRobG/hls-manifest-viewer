@@ -1,8 +1,8 @@
 use crate::utils::{
     network::RequestRange,
     query_codec::{
-        encode_asset_list, encode_definitions, encode_map, encode_part, encode_scte35,
-        encode_segment, percent_decode, percent_encode, Scte35CommandType,
+        encode_asset_list, encode_daterange_schedule, encode_definitions, encode_map, encode_part,
+        encode_scte35, encode_segment, percent_decode, percent_encode, Scte35CommandType,
     },
 };
 use leptos::prelude::GetUntracked;
@@ -109,12 +109,28 @@ pub fn asset_list_href(
     daterange_id: &str,
     definitions: &HashMap<String, String>,
 ) -> Option<String> {
-    media_asset_list_href(
+    json_href(
         base_url()?,
         definitions_query_value(),
         asset_list_uri,
         daterange_id,
         definitions,
+        encode_asset_list,
+    )
+}
+
+pub fn daterange_schedule_href(
+    x_uri: &str,
+    daterange_id: &str,
+    definitions: &HashMap<String, String>,
+) -> Option<String> {
+    json_href(
+        base_url()?,
+        definitions_query_value(),
+        x_uri,
+        daterange_id,
+        definitions,
+        encode_daterange_schedule,
     )
 }
 
@@ -231,20 +247,23 @@ fn media_scte35_href(
     }
 }
 
-fn media_asset_list_href(
+fn json_href<F>(
     base_url: Url,
     definitions_query_value: Option<String>,
-    asset_list_uri: &str,
+    x_uri: &str,
     daterange_id: &str,
     local_definitions: &HashMap<String, String>,
-) -> Option<String> {
-    let asset_list_uri = replace_hls_variables(asset_list_uri, local_definitions);
-    let absolute_asset_list_url = base_url.join(&asset_list_uri).ok()?;
+    encode: F,
+) -> Option<String>
+where
+    F: Fn(&str, &str) -> String,
+{
+    let uri = replace_hls_variables(x_uri, local_definitions);
+    let absolute_url = base_url.join(&uri).ok()?;
     let query_encoded_base_url = percent_encode(base_url.as_str());
-    let asset_list_url_as_str = absolute_asset_list_url.as_str();
-    let encoded_supplemental_context = encode_asset_list(asset_list_url_as_str, daterange_id);
+    let url_as_str = absolute_url.as_str();
+    let encoded_supplemental_context = encode(url_as_str, daterange_id);
     if let Some(definitions_query_value) = definitions_query_value {
-        #[allow(clippy::uninlined_format_args)] // The line is too long when inlining the variables
         Some(format!(
             "?{}={}&{}={}&{}={}",
             PLAYLIST_URL_QUERY_NAME,
@@ -255,7 +274,6 @@ fn media_asset_list_href(
             encoded_supplemental_context,
         ))
     } else {
-        #[allow(clippy::uninlined_format_args)] // The line is too long when inlining the variables
         Some(format!(
             "?{}={}&{}={}",
             PLAYLIST_URL_QUERY_NAME,
@@ -526,12 +544,32 @@ mod tests {
                 SUPPLEMENTAL_VIEW_QUERY_NAME,
                 "ASSET_LIST,EXAMPLE%20ID%22https://cdn.com/hi/segment-100.mp4?token%3D1234"
             )),
-            media_asset_list_href(
+            json_href(
+                base_url.clone(),
+                Some(query_definitions.clone()),
+                uri,
+                "EXAMPLE ID",
+                &local_definitions,
+                encode_asset_list,
+            )
+        );
+        assert_eq!(
+            Some(format!(
+                "?{}={}&{}={}&{}={}",
+                PLAYLIST_URL_QUERY_NAME,
+                "https://example.com/hls/media.m3u8",
+                DEFINITIONS_QUERY_NAME,
+                "DOMAIN%3Dhttps://cdn.com",
+                SUPPLEMENTAL_VIEW_QUERY_NAME,
+                "DATERANGE_SCHEDULE,EXAMPLE%20ID%22https://cdn.com/hi/segment-100.mp4?token%3D1234"
+            )),
+            json_href(
                 base_url,
                 Some(query_definitions),
                 uri,
                 "EXAMPLE ID",
-                &local_definitions
+                &local_definitions,
+                encode_daterange_schedule,
             )
         );
     }

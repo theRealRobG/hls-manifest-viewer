@@ -59,12 +59,19 @@ pub struct AssetListContext {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct DaterangeScheduleContext {
+    pub url: String,
+    pub daterange_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum SupplementalViewQueryContext {
     Segment(MediaSegmentContext),
     Map(MediaSegmentContext),
     Part(PartSegmentContext),
     Scte35(Scte35Context),
     AssetList(AssetListContext),
+    DaterangeSchedule(DaterangeScheduleContext),
 }
 
 pub fn encode_segment(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
@@ -102,6 +109,13 @@ pub fn encode_scte35(message: &str, daterange_id: &str, command_type: Scte35Comm
 pub fn encode_asset_list(url: &str, daterange_id: &str) -> String {
     percent_encode(&format!(
         "ASSET_LIST,{daterange_id}{SPECIAL_SEPARATOR}{url}"
+    ))
+    .to_string()
+}
+
+pub fn encode_daterange_schedule(url: &str, daterange_id: &str) -> String {
+    percent_encode(&format!(
+        "DATERANGE_SCHEDULE,{daterange_id}{SPECIAL_SEPARATOR}{url}"
     ))
     .to_string()
 }
@@ -279,6 +293,22 @@ impl TryFrom<&str> for SupplementalViewQueryContext {
                 };
                 Ok(Self::AssetList(AssetListContext { url, daterange_id }))
             }
+            "DATERANGE_SCHEDULE" => {
+                let Some(value) = split.next() else {
+                    return Err(SupplementalViewQueryContextDecodeError::EmptyContextValue);
+                };
+                let mut split = value.splitn(2, SPECIAL_SEPARATOR);
+                let Some(daterange_id) = split.next().map(String::from) else {
+                    return Err(SupplementalViewQueryContextDecodeError::MissingDaterangeId);
+                };
+                let Some(url) = split.next().map(String::from) else {
+                    return Err(SupplementalViewQueryContextDecodeError::MissingAssetListUrl);
+                };
+                Ok(Self::DaterangeSchedule(DaterangeScheduleContext {
+                    url,
+                    daterange_id,
+                }))
+            }
             _ => Err(SupplementalViewQueryContextDecodeError::UnknownContextType(
                 type_part.to_string(),
             )),
@@ -337,6 +367,7 @@ impl SupplementalViewQueryContext {
             ),
             Self::Scte35(s) => encode_scte35(&s.message, &s.daterange_id, s.command_type),
             Self::AssetList(a) => encode_asset_list(&a.url, &a.daterange_id),
+            Self::DaterangeSchedule(d) => encode_daterange_schedule(&d.url, &d.daterange_id),
         }
     }
 }
@@ -646,6 +677,18 @@ mod tests {
             }),
             encoded: "ASSET_LIST,test%3Dtrue%22https://example.com/ads.json",
             decoded: "ASSET_LIST,test=true\"https://example.com/ads.json"
+        );
+    }
+
+    #[test]
+    fn encode_decode_daterange_schedule_should_encode_and_percent_encode_id() {
+        assert_codec_equality!(
+            input: SupplementalViewQueryContext::DaterangeSchedule(DaterangeScheduleContext {
+                url: String::from("https://example.com/ads.json"),
+                daterange_id: String::from("test=true"),
+            }),
+            encoded: "DATERANGE_SCHEDULE,test%3Dtrue%22https://example.com/ads.json",
+            decoded: "DATERANGE_SCHEDULE,test=true\"https://example.com/ads.json"
         );
     }
 
