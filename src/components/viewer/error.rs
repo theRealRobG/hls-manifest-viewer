@@ -1,5 +1,6 @@
 use super::{ERROR_CLASS, ERROR_CONTAINER_CLASS};
 use leptos::{either::Either, prelude::*};
+use std::str::FromStr;
 
 #[component]
 pub fn ViewerError(
@@ -15,7 +16,7 @@ pub fn ViewerError(
                     view! {
                         <div class=ERROR_CONTAINER_CLASS>
                             <p class=ERROR_CLASS>{error}</p>
-                            <pre class=ERROR_CLASS>{extra_info}</pre>
+                            <pre class=ERROR_CLASS>{format(extra_info)}</pre>
                         </div>
                     },
                 )
@@ -29,5 +30,16 @@ pub fn ViewerError(
                 )
             }
         }}
+    }
+}
+
+fn format(error: String) -> String {
+    let Ok(json) = serde_json::Value::from_str(&error) else {
+        return error;
+    };
+    if let Ok(pretty_error) = serde_json::to_string_pretty(&json) {
+        pretty_error
+    } else {
+        error
     }
 }
