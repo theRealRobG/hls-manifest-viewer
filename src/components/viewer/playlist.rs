@@ -492,7 +492,7 @@ enum InterstitialType {
     AssetList,
 }
 fn guess_interstitial_type_from_uri(uri: &str) -> Option<InterstitialType> {
-    let before_query = uri.splitn(2, '?').next()?;
+    let before_query = uri.split('?').next()?;
     let last_path = before_query.split('/').next_back()?;
     let extension = last_path.split('.').next_back()?;
     if extension.eq_ignore_ascii_case("m3u8") {
