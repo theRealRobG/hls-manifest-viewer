@@ -1,4 +1,6 @@
-use crate::utils::mp4_parsing::{Colr, Dac3, Dac4, Dec3, Frma, Lac4, Prft, Pssh, Schm, Senc, Tenc};
+use crate::utils::mp4_parsing::{
+    Colr, Dac3, Dac4, Dec3, Dvvc, Frma, Lac4, Prft, Pssh, Schm, Senc, Tenc,
+};
 use mp4_atom::{Any, Atom, Audio, Buf, Decode, DecodeAtom, FourCC, Header, Visual};
 use std::{borrow::Cow, fmt::Display, io::Cursor};
 
@@ -19,6 +21,7 @@ mod dec3;
 mod desc;
 mod dops;
 mod dref;
+mod dvvc;
 mod elst;
 mod emsg;
 mod esds;
@@ -481,6 +484,8 @@ pub fn get_properties(
         Dec3::KIND => try_properties_from::<Dec3>(header, reader),
         Lac4::KIND => try_properties_from::<Lac4>(header, reader),
         Dac4::KIND => try_properties_from::<Dac4>(header, reader),
+        Dvvc::KIND => try_properties_from::<Dvvc>(header, reader),
+        Dvvc::ALTERNATIVE_KIND => try_properties_from::<Dvvc>(header, reader),
         // Overriding implementation from mp4-atom to add unknown case and nclc case defined in
         // QuickTime File Format.
         Colr::KIND => try_properties_from::<Colr>(header, reader),
