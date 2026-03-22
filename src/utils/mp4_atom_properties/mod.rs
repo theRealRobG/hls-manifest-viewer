@@ -416,6 +416,8 @@ pub fn get_properties(
                 "Extends to end of file",
             ))),
     );
+    const DVHE: FourCC = FourCC::new(b"dvhe");
+    const DVH1: FourCC = FourCC::new(b"dvh1");
     let mut properties = match header.kind {
         // Container boxes
         mp4_atom::Meta::KIND => container(header, "MetaBox", reader),
@@ -437,6 +439,8 @@ pub fn get_properties(
         mp4_atom::Avc1::KIND => visual_entry(header, "AVCSampleEntryBox", reader),
         mp4_atom::Hev1::KIND => visual_entry(header, "HEVCSampleEntryBox", reader),
         mp4_atom::Hvc1::KIND => visual_entry(header, "HEVCSampleEntryBox", reader),
+        DVHE => visual_entry(header, "DolbyVisionHEVCSampleEntryBox", reader),
+        DVH1 => visual_entry(header, "DolbyVisionHVC1SampleEntryBox", reader),
         mp4_atom::Vp08::KIND => visual_entry(header, "VP08SampleEntryBox", reader),
         mp4_atom::Vp09::KIND => visual_entry(header, "VP09SampleEntryBox", reader),
         mp4_atom::Av01::KIND => visual_entry(header, "AV1SampleEntryBox", reader),
