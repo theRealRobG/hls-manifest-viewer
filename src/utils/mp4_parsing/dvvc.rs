@@ -1,8 +1,9 @@
-use mp4_atom::{Atom, Buf, BufMut, Decode, FourCC, Result, u24};
+use crate::utils::mp4_parsing::dvcc::Dvcc;
+use mp4_atom::{u24, Atom, Buf, BufMut, Decode, FourCC, Result};
 
 /// DOVIDecoderConfigurationRecord, Dolby Vision Streams Within the ISO Base Media File Format,
 /// Section 2.2
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct Dvvc {
     pub dv_version_major: u8,
     pub dv_version_minor: u8,
@@ -13,11 +14,6 @@ pub struct Dvvc {
     pub bl_present: bool,
     pub dv_bl_signal_compatibility_id: u8,
     pub dv_md_compression: u8,
-}
-
-impl Dvvc {
-    /// Both `dvvC` and `dvcC` are valid for this atom.
-    pub const ALTERNATIVE_KIND: FourCC = FourCC::new(b"dvcC");
 }
 
 impl Atom for Dvvc {
@@ -70,6 +66,22 @@ impl Atom for Dvvc {
 
     fn encode_body<B: BufMut>(&self, _: &mut B) -> Result<()> {
         unimplemented!()
+    }
+}
+
+impl From<Dvcc> for Dvvc {
+    fn from(dvcc: Dvcc) -> Self {
+        Self {
+            dv_version_major: dvcc.dv_version_major,
+            dv_version_minor: dvcc.dv_version_minor,
+            dv_profile: dvcc.dv_profile,
+            dv_level: dvcc.dv_level,
+            rpu_present: dvcc.rpu_present,
+            el_present: dvcc.el_present,
+            bl_present: dvcc.bl_present,
+            dv_bl_signal_compatibility_id: dvcc.dv_bl_signal_compatibility_id,
+            dv_md_compression: dvcc.dv_md_compression,
+        }
     }
 }
 

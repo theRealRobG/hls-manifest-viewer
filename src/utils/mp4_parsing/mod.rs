@@ -2,6 +2,7 @@ pub mod colr;
 pub mod dac3;
 pub mod dac4;
 pub mod dec3;
+pub mod dvcc;
 pub mod dvvc;
 pub mod frma;
 pub mod lac4;
