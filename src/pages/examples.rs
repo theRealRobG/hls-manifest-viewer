@@ -184,15 +184,15 @@ const APPLE_ADVANCED_EXAMPLES: [Example; 3] = [
 const USP_EXAMPLES: [Example; 3] = [
     Example {
         description: "Trickplay with byterange addressing",
-        playlist_url: "https://demo.unified-streaming.com/k8s/features/stable/no-handler-origin/tears-of-steel/tears-of-steel-trickplay.m3u8"
+        playlist_url: "https://demo.unified-streaming.com/k8s/features/stable/no-handler-origin/tears-of-steel/tears-of-steel-trickplay.m3u8",
     },
     Example {
         description: "AV1",
-        playlist_url: "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel-av1.ism/.m3u8"
+        playlist_url: "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel-av1.ism/.m3u8",
     },
     Example {
         description: "Live with SCTE35 messages in EXT-X-DATERANGE tags (TS segments)",
-        playlist_url: "https://demo.unified-streaming.com/k8s/vod2live/stable/unified-learning.isml/.m3u8"
+        playlist_url: "https://demo.unified-streaming.com/k8s/vod2live/stable/unified-learning.isml/.m3u8",
     },
 ];
 // https://optiview.dolby.com/resources/demos/test-stream/
@@ -203,15 +203,14 @@ const DOLBY_DEMO_PAGE_EXAMPLES: [Example; 3] = [
             "segments after the first are omitted which is another interesting use case to test ",
             "byterange handling)"
         ),
-        playlist_url:
-            "https://media.axprod.net/TestVectors/Cmaf/protected_1080p_h264_cbcs/manifest.m3u8",
+        playlist_url: "https://media.axprod.net/TestVectors/Cmaf/protected_1080p_h264_cbcs/manifest.m3u8",
     },
     Example {
         description: "Low Latency - AirenSoft",
-        playlist_url: "https://llhls-demo.ovenmediaengine.com/app/stream/llhls.m3u8"
+        playlist_url: "https://llhls-demo.ovenmediaengine.com/app/stream/llhls.m3u8",
     },
     Example {
         description: "Low Latency - Nimble Streamer",
-        playlist_url: "https://ll-hls.softvelum.com/sldp/bbloop/playlist.m3u8"
+        playlist_url: "https://ll-hls.softvelum.com/sldp/bbloop/playlist.m3u8",
     },
 ];

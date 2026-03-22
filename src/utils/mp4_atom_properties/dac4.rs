@@ -4,11 +4,11 @@ use crate::utils::{
         TablePropertyValue,
     },
     mp4_parsing::{
+        Dac4,
         dac4::{
             Ac4BitrateMode, Ac4ContentClassifier, Ac4Presentation, Ac4PresentationV0,
             Ac4PresentationV1, Ac4SubstreamGroup, EmdfSubstream,
         },
-        Dac4,
     },
 };
 use std::{borrow::Cow, fmt::Display};

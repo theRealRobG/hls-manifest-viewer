@@ -1,6 +1,6 @@
 use crate::utils::mp4_atom_properties::{
-    byte_array_from, AtomProperties, AtomPropertyValue, AtomWithProperties, BasicPropertyValue,
-    TablePropertyValue,
+    AtomProperties, AtomPropertyValue, AtomWithProperties, BasicPropertyValue, TablePropertyValue,
+    byte_array_from,
 };
 use mp4_atom::Avcc;
 

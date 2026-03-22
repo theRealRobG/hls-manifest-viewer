@@ -1,7 +1,7 @@
 use crate::{
     components::viewer::ISOBMFF_VIEW_CLASS,
     utils::mp4_atom_properties::{
-        get_properties, AtomProperties, AtomPropertyValue, BasicPropertyValue, TablePropertyValue,
+        AtomProperties, AtomPropertyValue, BasicPropertyValue, TablePropertyValue, get_properties,
     },
 };
 use leptos::{

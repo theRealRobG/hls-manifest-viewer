@@ -2,7 +2,7 @@ use super::{LINE_BREAK_ANYWHERE, LINE_BREAK_WORD, SUPPLEMENTAL_VIEW_CLASS, UNDER
 use crate::{
     components::viewer::error::ViewerError,
     utils::{
-        hex::{decode_hex, DecodeHexError},
+        hex::{DecodeHexError, decode_hex},
         query_codec::{Scte35CommandType, Scte35Context},
     },
 };

@@ -6,8 +6,8 @@ use crate::utils::{
         TablePropertyValue,
     },
     mp4_parsing::{
-        dec3::{ChanLoc, IndependentSubstream},
         Dec3,
+        dec3::{ChanLoc, IndependentSubstream},
     },
 };
 

@@ -1,5 +1,5 @@
 use crate::utils::mp4_atom_properties::{
-    array_string_from, AtomProperties, AtomPropertyValue, AtomWithProperties,
+    AtomProperties, AtomPropertyValue, AtomWithProperties, array_string_from,
 };
 use mp4_atom::Stsz;
 

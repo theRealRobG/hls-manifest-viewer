@@ -1,5 +1,8 @@
 use super::{SUPPLEMENTAL_VIEW_CLASS, UNDERLINED};
-use crate::{components::viewer::{SPACER_BOTTOM, error::ViewerError}, utils::href::{asset_list_href, media_playlist_href}};
+use crate::{
+    components::viewer::{SPACER_BOTTOM, error::ViewerError},
+    utils::href::{asset_list_href, media_playlist_href},
+};
 use leptos::{either::Either, prelude::*};
 use serde_json::Value;
 use std::{collections::HashMap, str::FromStr};
@@ -62,9 +65,13 @@ pub fn DaterangeScheduleView(json: String) -> impl IntoView {
 
 #[component]
 fn Row(id: String, key: String, value: String) -> impl IntoView {
-    let value = if key == "X-ASSET-URI" && let Some(href) = media_playlist_href(&value, &HashMap::new()) {
+    let value = if key == "X-ASSET-URI"
+        && let Some(href) = media_playlist_href(&value, &HashMap::new())
+    {
         Either::Left(view! { <a href=href>{value}</a> })
-    } else if key == "X-ASSET-LIST" && let Some(href) = asset_list_href(&value, &id, &HashMap::new()) {
+    } else if key == "X-ASSET-LIST"
+        && let Some(href) = asset_list_href(&value, &id, &HashMap::new())
+    {
         Either::Left(view! { <a href=href>{value}</a> })
     } else {
         Either::Right(view! { {value} })
@@ -94,8 +101,14 @@ fn dateranges_from_json(json: &str) -> Option<Vec<DaterangeAttributes>> {
                 },
             ));
         }
-        if let Some(id) = attributes.iter().find_map(|(k, v)| if k == "ID" { Some(v) } else { None }) {
-            dateranges.push(DaterangeAttributes { id: id.to_string(), attributes });
+        if let Some(id) = attributes
+            .iter()
+            .find_map(|(k, v)| if k == "ID" { Some(v) } else { None })
+        {
+            dateranges.push(DaterangeAttributes {
+                id: id.to_string(),
+                attributes,
+            });
         } else {
             return None;
         }

@@ -2,8 +2,8 @@ use crate::{
     components::{UrlInputForm, Viewer, ViewerLoading},
     utils::{
         href::{
-            query_value_from_leptos_url, DEFINITIONS_QUERY_NAME, PLAYLIST_URL_QUERY_NAME,
-            SUPPLEMENTAL_VIEW_QUERY_NAME,
+            DEFINITIONS_QUERY_NAME, PLAYLIST_URL_QUERY_NAME, SUPPLEMENTAL_VIEW_QUERY_NAME,
+            query_value_from_leptos_url,
         },
         network::fetch_text,
         query_codec::{decode_definitions, percent_decode},

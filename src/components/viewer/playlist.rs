@@ -6,7 +6,8 @@ use crate::{
     components::CopyButton,
     utils::{
         href::{
-            asset_list_href, daterange_schedule_href, map_href, media_playlist_href, part_href, resolve_playlist_relative_url, scte35_href, segment_href
+            asset_list_href, daterange_schedule_href, map_href, media_playlist_href, part_href,
+            resolve_playlist_relative_url, scte35_href, segment_href,
         },
         network::RequestRange,
         query_codec::Scte35CommandType,
@@ -15,14 +16,14 @@ use crate::{
 use leptos::{either::EitherOf3, prelude::*};
 use leptos_router::hooks::use_query_map;
 use quick_m3u8::{
+    HlsLine, Reader,
     config::ParsingOptionsBuilder,
     tag::{
+        AttributeValue, IntoInnerTag, KnownTag, UnknownTag,
         hls::{
             Byterange, Define, MapByterange, MediaSequence, PartByterange, Tag, TagName, TagType,
         },
-        AttributeValue, IntoInnerTag, KnownTag, UnknownTag,
     },
-    HlsLine, Reader,
 };
 use std::{borrow::Cow, collections::HashMap, error::Error, fmt::Display};
 
@@ -54,7 +55,7 @@ pub enum Highlighted {
     },
     XUri {
         daterange_id: String,
-    }
+    },
 }
 
 pub struct HighlightedMapInfo {
@@ -368,7 +369,10 @@ fn x_daterange(tag: &UnknownTag, state: &mut ParsingState) {
     let mut id = None;
     let mut class = None;
     let mut target_class = None;
-    if let Some(attribute_list) = tag.value().and_then(|v| v.try_as_ordered_attribute_list().ok()) {
+    if let Some(attribute_list) = tag
+        .value()
+        .and_then(|v| v.try_as_ordered_attribute_list().ok())
+    {
         for (name, value) in attribute_list {
             if name == "ID" {
                 id = value.quoted().map(String::from);
@@ -403,18 +407,19 @@ fn x_daterange(tag: &UnknownTag, state: &mut ParsingState) {
             "X-ASSET-LIST" => id
                 .as_ref()
                 .and_then(|id| asset_list_href(value, id, &state.local_definitions)),
-            "X-URI" if class.as_ref().is_some_and(|c| c == "com.apple.hls.preload") => id
-                .as_ref()
-                .and_then(|id| {
+            "X-URI" if class.as_ref().is_some_and(|c| c == "com.apple.hls.preload") => {
+                id.as_ref().and_then(|id| {
                     let Some(target_class) = &target_class else {
                         return None;
                     };
                     if target_class == "com.apple.hls.interstitial" {
                         match guess_interstitial_type_from_uri(value) {
-                            Some(InterstitialType::AssetList) =>
-                                asset_list_href(value, id, &state.local_definitions),
-                            Some(InterstitialType::Uri) =>
-                                media_playlist_href(value, &state.local_definitions),
+                            Some(InterstitialType::AssetList) => {
+                                asset_list_href(value, id, &state.local_definitions)
+                            }
+                            Some(InterstitialType::Uri) => {
+                                media_playlist_href(value, &state.local_definitions)
+                            }
                             None => None,
                         }
                     } else if target_class == "com.apple.hls.daterange-schedule" {
@@ -422,46 +427,50 @@ fn x_daterange(tag: &UnknownTag, state: &mut ParsingState) {
                     } else {
                         None
                     }
-                }),
-            "X-URI" if class.as_ref().is_some_and(|c| c == "com.apple.hls.daterange-schedule") => id
-                .as_ref()
-                .and_then(|id| daterange_schedule_href(value, id, &state.local_definitions)),
+                })
+            }
+            "X-URI"
+                if class
+                    .as_ref()
+                    .is_some_and(|c| c == "com.apple.hls.daterange-schedule") =>
+            {
+                id.as_ref()
+                    .and_then(|id| daterange_schedule_href(value, id, &state.local_definitions))
+            }
             _ => {
                 log::error!("unexpected SCTE35 attribute on daterange: {name}");
                 None
             }
         },
-        |name, _| {
-            match name {
-                "SCTE35-CMD" | "SCTE35-OUT" | "SCTE35-IN" => state
-                    .highlighted_scte35_info
-                    .as_ref()
-                    .and_then(|info| {
-                        id.as_ref().and_then(|id| {
-                            if id == &info.daterange_id {
-                                match info.command_type {
-                                    Scte35CommandType::Cmd => Some(name == "SCTE35-CMD"),
-                                    Scte35CommandType::Out => Some(name == "SCTE35-OUT"),
-                                    Scte35CommandType::In => Some(name == "SCTE35-IN"),
-                                }
-                            } else {
-                                None
+        |name, _| match name {
+            "SCTE35-CMD" | "SCTE35-OUT" | "SCTE35-IN" => state
+                .highlighted_scte35_info
+                .as_ref()
+                .and_then(|info| {
+                    id.as_ref().and_then(|id| {
+                        if id == &info.daterange_id {
+                            match info.command_type {
+                                Scte35CommandType::Cmd => Some(name == "SCTE35-CMD"),
+                                Scte35CommandType::Out => Some(name == "SCTE35-OUT"),
+                                Scte35CommandType::In => Some(name == "SCTE35-IN"),
                             }
-                        })
+                        } else {
+                            None
+                        }
                     })
-                    .unwrap_or(false),
-                "X-ASSET-LIST" => state
-                    .highlighted_asset_list_daterange_id
-                    .as_ref()
-                    .map(|highlighted_id| id.as_ref() == Some(highlighted_id))
-                    .unwrap_or(false),
-                "X-URI" => state
-                    .highlighted_x_uri_daterange_id
-                    .as_ref()
-                    .map(|highlighted_id| id.as_ref() == Some(highlighted_id))
-                    .unwrap_or(false),
-                _ => false,
-            }
+                })
+                .unwrap_or(false),
+            "X-ASSET-LIST" => state
+                .highlighted_asset_list_daterange_id
+                .as_ref()
+                .map(|highlighted_id| id.as_ref() == Some(highlighted_id))
+                .unwrap_or(false),
+            "X-URI" => state
+                .highlighted_x_uri_daterange_id
+                .as_ref()
+                .map(|highlighted_id| id.as_ref() == Some(highlighted_id))
+                .unwrap_or(false),
+            _ => false,
         },
     );
     state.lines.push(view_from_markup(markup));

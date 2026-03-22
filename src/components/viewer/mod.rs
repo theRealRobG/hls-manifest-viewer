@@ -10,12 +10,12 @@ mod scte35;
 use crate::{
     components::viewer::daterange_schedule::DaterangeScheduleView,
     utils::{
-        network::{fetch_array_buffer, fetch_text, FetchError, FetchTextResponse, RequestRange},
+        network::{FetchError, FetchTextResponse, RequestRange, fetch_array_buffer, fetch_text},
         query_codec::{
             AssetListContext, DaterangeScheduleContext, MediaSegmentContext, PartSegmentContext,
             SupplementalViewQueryContext,
         },
-        response::{determine_segment_type, SegmentType},
+        response::{SegmentType, determine_segment_type},
     },
 };
 use asset_list::AssetListView;

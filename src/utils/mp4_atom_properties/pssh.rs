@@ -4,7 +4,7 @@ use crate::utils::{
         AtomProperties, AtomPropertyValue, AtomWithProperties, BasicPropertyValue,
         TablePropertyValue,
     },
-    mp4_parsing::{pssh::PsshData, Pssh},
+    mp4_parsing::{Pssh, pssh::PsshData},
     pssh_data::playready::PlayReadyRecordType,
 };
 use widevine_proto::license_protocol::widevine_pssh_data::{Algorithm, Type};
