@@ -1,5 +1,7 @@
 use crate::utils::mp4_parsing::{
-    dvcc::Dvcc, Colr, Dac3, Dac4, Dec3, Dvvc, Frma, Hvce, Lac4, Lhvc, Prft, Pssh, Schm, Senc, Tenc,
+    dvcc::Dvcc, Blin, Colr, Corg, Dac3, Dac4, Dadj, Dec3, Dvvc, Equi, Fish, Frma, Hequ, Hero,
+    Hfov, Hvce, Lac4, Ldst, Lfad, Lhvc, Lnhd, Lnin, Must, Pkin, Prim, Prft, Prji, Pssh, Rdim,
+    Rect, Schm, Senc, Stri, Tenc, Uqua,
 };
 use mp4_atom::{Any, Atom, Audio, Buf, Decode, DecodeAtom, FourCC, Header, Visual};
 use std::{borrow::Cow, fmt::Display, io::Cursor};
@@ -7,16 +9,19 @@ use std::{borrow::Cow, fmt::Display, io::Cursor};
 mod auxc;
 mod av1c;
 mod avcc;
+mod blin;
 mod btrt;
 mod ccst;
 mod clap;
 mod cmpd;
 mod co64;
 mod colr;
+mod corg;
 mod covr;
 mod ctts;
 mod dac3;
 mod dac4;
+mod dadj;
 mod dec3;
 mod desc;
 mod dops;
@@ -25,14 +30,18 @@ mod dvcc;
 mod dvvc;
 mod elst;
 mod emsg;
+mod equi;
 mod esds;
+mod fish;
 mod free;
 mod frma;
 mod ftyp;
 mod hdlr;
+mod hequ;
+mod hero;
+mod hfov;
 mod hvcc;
 mod hvce;
-mod lhvc;
 mod idat;
 mod iinf;
 mod iloc;
@@ -43,16 +52,27 @@ mod irot;
 mod iscl;
 mod ispe;
 mod lac4;
+mod ldst;
+mod lfad;
+mod lhvc;
+mod lnhd;
+mod lnin;
 mod mdhd;
 mod mehd;
 mod mfhd;
+mod must;
 mod mvhd;
 mod name;
 mod pasp;
 mod pitm;
 mod pixi;
+mod pkin;
+mod prim;
 mod prft;
+mod prji;
 mod pssh;
+mod rdim;
+mod rect;
 mod rref;
 mod saio;
 mod saiz;
@@ -63,6 +83,7 @@ mod sgpd;
 mod skip;
 mod smhd;
 mod stco;
+mod stri;
 mod stsc;
 mod stss;
 mod stsz;
@@ -78,6 +99,7 @@ mod trex;
 mod trun;
 mod tx3g;
 mod uncc;
+mod uqua;
 mod vmhd;
 mod vpcc;
 mod year;
@@ -482,6 +504,59 @@ pub fn get_properties(
         four_cc if four_cc == FourCC::new(b"schi") => {
             container(header, "SchemeInformationBox", reader)
         }
+        // VEXU container boxes (ISO/IEC 23001-18)
+        four_cc if four_cc == FourCC::new(b"vexu") => {
+            container(header, "VideoExtendedUsageBox", reader)
+        }
+        four_cc if four_cc == FourCC::new(b"eyes") => {
+            container(header, "StereoViewBox", reader)
+        }
+        four_cc if four_cc == FourCC::new(b"cams") => {
+            container(header, "StereoCameraSystemBox", reader)
+        }
+        four_cc if four_cc == FourCC::new(b"cmfy") => {
+            container(header, "StereoComfortBox", reader)
+        }
+        four_cc if four_cc == FourCC::new(b"proj") => {
+            container(header, "ProjectionBox", reader)
+        }
+        four_cc if four_cc == FourCC::new(b"pack") => {
+            container(header, "ViewPackingBox", reader)
+        }
+        four_cc if four_cc == FourCC::new(b"lnsc") => {
+            container(header, "CameraSystemLensCollectionBox", reader)
+        }
+        four_cc if four_cc == FourCC::new(b"lens") => {
+            container(header, "CameraSystemLensBox", reader)
+        }
+        four_cc if four_cc == FourCC::new(b"lnex") => {
+            container(header, "CameraSystemLensExtrinsicsBox", reader)
+        }
+        four_cc if four_cc == FourCC::new(b"cxfm") => {
+            container(header, "CameraSystemTransformBox", reader)
+        }
+        // VEXU data boxes
+        Must::KIND => try_properties_from::<Must>(header, reader),
+        Stri::KIND => try_properties_from::<Stri>(header, reader),
+        Hero::KIND => try_properties_from::<Hero>(header, reader),
+        Blin::KIND => try_properties_from::<Blin>(header, reader),
+        Dadj::KIND => try_properties_from::<Dadj>(header, reader),
+        Prji::KIND => try_properties_from::<Prji>(header, reader),
+        Pkin::KIND => try_properties_from::<Pkin>(header, reader),
+        Hfov::KIND => try_properties_from::<Hfov>(header, reader),
+        Lnhd::KIND => try_properties_from::<Lnhd>(header, reader),
+        Rdim::KIND => try_properties_from::<Rdim>(header, reader),
+        Lnin::KIND => try_properties_from::<Lnin>(header, reader),
+        Ldst::KIND => try_properties_from::<Ldst>(header, reader),
+        Lfad::KIND => try_properties_from::<Lfad>(header, reader),
+        Corg::KIND => try_properties_from::<Corg>(header, reader),
+        Uqua::KIND => try_properties_from::<Uqua>(header, reader),
+        Rect::KIND => try_properties_from::<Rect>(header, reader),
+        Equi::KIND => try_properties_from::<Equi>(header, reader),
+        Hequ::KIND => try_properties_from::<Hequ>(header, reader),
+        Fish::KIND => try_properties_from::<Fish>(header, reader),
+        Prim::KIND => try_properties_from::<Prim>(header, reader),
+        // Other custom atoms
         Prft::KIND => try_properties_from::<Prft>(header, reader),
         Frma::KIND => try_properties_from::<Frma>(header, reader),
         Schm::KIND => try_properties_from::<Schm>(header, reader),
@@ -560,9 +635,10 @@ fn decode_container_version_and_flags(
     header: &Header,
     reader: &mut Cursor<Vec<u8>>,
 ) -> mp4_atom::Result<Vec<(&'static str, AtomPropertyValue)>> {
+    const LENS: FourCC = FourCC::new(b"lens");
     match header.kind {
         // Known full boxes that are also containers
-        mp4_atom::Meta::KIND | mp4_atom::Stsd::KIND => {
+        mp4_atom::Meta::KIND | mp4_atom::Stsd::KIND | LENS => {
             let version = u8::decode(reader)?;
             let flags = [
                 u8::decode(reader)?,
