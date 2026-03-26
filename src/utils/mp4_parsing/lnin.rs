@@ -22,15 +22,15 @@ impl Atom for Lnin {
     fn decode_body<B: Buf>(buf: &mut B) -> Result<Self> {
         let ext = u32::decode(buf)?;
         let flags = ext & 0x00FF_FFFF;
-        let denominator_shift_operand = u16::decode(buf)? as i16;
-        let skew_denominator_shift_operand = u16::decode(buf)? as i16;
-        let focal_length_x = u32::decode(buf)? as i32;
-        let principal_point_x = u32::decode(buf)? as i32;
-        let principal_point_y = u32::decode(buf)? as i32;
+        let denominator_shift_operand = i16::decode(buf)?;
+        let skew_denominator_shift_operand = i16::decode(buf)?;
+        let focal_length_x = i32::decode(buf)?;
+        let principal_point_x = i32::decode(buf)?;
+        let principal_point_y = i32::decode(buf)?;
         let (focal_length_y, skew_factor) = if flags & 1 != 0 {
             (
-                Some(u32::decode(buf)? as i32),
-                Some(u32::decode(buf)? as i32),
+                Some(i32::decode(buf)?),
+                Some(i32::decode(buf)?),
             )
         } else {
             (None, None)
