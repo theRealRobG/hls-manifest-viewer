@@ -35,7 +35,7 @@ impl Atom for Lnin {
         } else {
             (None, None)
         };
-        let projection_offset = if flags & 2 != 0 {
+        let projection_offset = if flags & 2 == 2 {
             Some(f32::from_bits(u32::decode(buf)?))
         } else {
             None
