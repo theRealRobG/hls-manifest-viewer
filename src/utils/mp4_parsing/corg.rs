@@ -1,6 +1,6 @@
 use mp4_atom::{Atom, Buf, BufMut, Decode, FourCC, Result};
 
-/// CameraSystemOriginSourceBox, ISO/IEC 23001-18.
+/// CameraSystemOriginSourceBox, QuickTime and ISO Base Media File Formats and Spatial and Immersive Media, Version 1.9.8 (Beta).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Corg {
     pub source_of_origin: FourCC,

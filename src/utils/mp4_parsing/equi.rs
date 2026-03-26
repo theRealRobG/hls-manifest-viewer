@@ -1,6 +1,6 @@
 use mp4_atom::{Atom, Buf, BufMut, Decode, FourCC, Result};
 
-/// FullEquirectangularProjectionBox, ISO/IEC 23001-18.
+/// FullEquirectangularProjectionBox, QuickTime and ISO Base Media File Formats and Spatial and Immersive Media, Version 1.9.8 (Beta).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Equi;
 

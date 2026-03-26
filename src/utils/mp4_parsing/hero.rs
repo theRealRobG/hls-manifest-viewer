@@ -1,6 +1,6 @@
 use mp4_atom::{Atom, Buf, BufMut, Decode, FourCC, Result};
 
-/// HeroStereoEyeDescriptionBox, ISO/IEC 23001-18.
+/// HeroStereoEyeDescriptionBox, QuickTime and ISO Base Media File Formats and Spatial and Immersive Media, Version 1.9.8 (Beta).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hero {
     pub hero_eye_indicator: u8,
