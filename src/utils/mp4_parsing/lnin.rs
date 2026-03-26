@@ -27,7 +27,7 @@ impl Atom for Lnin {
         let focal_length_x = i32::decode(buf)?;
         let principal_point_x = i32::decode(buf)?;
         let principal_point_y = i32::decode(buf)?;
-        let (focal_length_y, skew_factor) = if flags & 1 != 0 {
+        let (focal_length_y, skew_factor) = if flags & 1 == 1 {
             (
                 Some(i32::decode(buf)?),
                 Some(i32::decode(buf)?),
