@@ -21,7 +21,7 @@ impl Atom for Ldst {
         let k2 = f32::from_bits(u32::decode(buf)?);
         let p1 = f32::from_bits(u32::decode(buf)?);
         let p2 = f32::from_bits(u32::decode(buf)?);
-        let calibration_limit_radial_angle = if flags & 1 != 0 {
+        let calibration_limit_radial_angle = if flags & 1 == 1 {
             Some(f32::from_bits(u32::decode(buf)?))
         } else {
             None
