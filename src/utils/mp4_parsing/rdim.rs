@@ -1,6 +1,6 @@
 use mp4_atom::{Atom, Buf, BufMut, Decode, FourCC, Result};
 
-/// CameraSystemLensReferenceDimensionsBox, ISO/IEC 23001-18.
+/// CameraSystemLensReferenceDimensionsBox, QuickTime and ISO Base Media File Formats and Spatial and Immersive Media, Version 1.9.8 (Beta).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rdim {
     pub reference_width: u32,

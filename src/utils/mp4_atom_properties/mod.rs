@@ -504,7 +504,7 @@ pub fn get_properties(
         four_cc if four_cc == FourCC::new(b"schi") => {
             container(header, "SchemeInformationBox", reader)
         }
-        // VEXU container boxes (ISO/IEC 23001-18)
+        // VEXU container boxes (QuickTime and ISO Base Media File Formats and Spatial and Immersive Media, Version 1.9.8 (Beta))
         four_cc if four_cc == FourCC::new(b"vexu") => {
             container(header, "VideoExtendedUsageBox", reader)
         }

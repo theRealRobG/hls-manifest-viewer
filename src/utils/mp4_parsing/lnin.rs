@@ -1,6 +1,6 @@
 use mp4_atom::{Atom, Buf, BufMut, Decode, FourCC, Result};
 
-/// CameraSystemLensIntrinsicsBox, ISO/IEC 23001-18.
+/// CameraSystemLensIntrinsicsBox, QuickTime and ISO Base Media File Formats and Spatial and Immersive Media, Version 1.9.8 (Beta).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Lnin {
     pub denominator_shift_operand: i16,

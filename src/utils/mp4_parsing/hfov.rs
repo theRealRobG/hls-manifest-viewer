@@ -1,6 +1,6 @@
 use mp4_atom::{Atom, Buf, BufMut, Decode, FourCC, Result};
 
-/// HorizontalFieldOfViewBox, ISO/IEC 23001-18.
+/// HorizontalFieldOfViewBox, QuickTime and ISO Base Media File Formats and Spatial and Immersive Media, Version 1.9.8 (Beta).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hfov {
     pub field_of_view: u32,

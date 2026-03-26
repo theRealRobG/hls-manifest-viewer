@@ -1,6 +1,6 @@
 use mp4_atom::{Atom, Buf, BufMut, Decode, FourCC, Result};
 
-/// StereoComfortDisparityAdjustmentBox, ISO/IEC 23001-18.
+/// StereoComfortDisparityAdjustmentBox, QuickTime and ISO Base Media File Formats and Spatial and Immersive Media, Version 1.9.8 (Beta).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Dadj {
     pub disparity_adjustment: i32,
