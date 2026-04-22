@@ -1,8 +1,8 @@
 use crate::utils::{
     network::RequestRange,
     query_codec::{
-        Scte35CommandType, encode_asset_list, encode_daterange_schedule, encode_definitions,
-        encode_map, encode_part, encode_scte35, encode_segment, percent_decode, percent_encode,
+        encode_asset_list, encode_daterange_schedule, encode_definitions, encode_map, encode_part,
+        encode_scte35, encode_segment, percent_decode, percent_encode, Scte35CommandType,
     },
 };
 use leptos::prelude::GetUntracked;
@@ -13,6 +13,7 @@ use url::Url;
 pub const PLAYLIST_URL_QUERY_NAME: &str = "playlist_url";
 pub const SUPPLEMENTAL_VIEW_QUERY_NAME: &str = "supplemental_view_context";
 pub const DEFINITIONS_QUERY_NAME: &str = "imported_definitions";
+pub const INIT_URL_QUERY_NAME: &str = "init_url";
 
 pub fn query_value_from_leptos_url<'a>(
     url: &'a leptos_router::location::Url,
@@ -43,6 +44,7 @@ pub fn segment_href(
     media_sequence: u64,
     byterange: Option<RequestRange>,
     definitions: &HashMap<String, String>,
+    init_url_query_value: Option<&str>,
 ) -> Option<String> {
     media_segment_href(
         base_url()?,
@@ -51,6 +53,7 @@ pub fn segment_href(
         byterange,
         SegmentType::Segment,
         definitions_query_value(),
+        init_url_query_value,
         definitions,
     )
 }
@@ -68,6 +71,7 @@ pub fn map_href(
         byterange,
         SegmentType::Map,
         definitions_query_value(),
+        None,
         definitions,
     )
 }
@@ -78,6 +82,7 @@ pub fn part_href(
     part_index: u32,
     byterange: Option<RequestRange>,
     definitions: &HashMap<String, String>,
+    init_url_query_value: Option<&str>,
 ) -> Option<String> {
     media_segment_href(
         base_url()?,
@@ -86,6 +91,7 @@ pub fn part_href(
         byterange,
         SegmentType::Part { part_index },
         definitions_query_value(),
+        init_url_query_value,
         definitions,
     )
 }
@@ -155,7 +161,6 @@ fn definitions_query_value() -> Option<String> {
     let url = use_url().get_untracked();
     query_value_from_leptos_url(&url, DEFINITIONS_QUERY_NAME).map(|cow| cow.to_string())
 }
-
 fn playlist_href(
     base_url: Url,
     relative_uri: &str,
@@ -164,16 +169,15 @@ fn playlist_href(
     let relative_uri = replace_hls_variables(relative_uri, local_definitions);
     let absolute_url = base_url.join(&relative_uri).ok()?;
     let query_encoded_url = percent_encode(absolute_url.as_str());
-    if local_definitions.is_empty() {
-        Some(format!("?{PLAYLIST_URL_QUERY_NAME}={query_encoded_url}"))
-    } else {
+    let mut href = format!("?{PLAYLIST_URL_QUERY_NAME}={query_encoded_url}");
+    if !local_definitions.is_empty() {
         let encoded_definitions = encode_definitions(local_definitions);
-        Some(format!(
-            "?{PLAYLIST_URL_QUERY_NAME}={query_encoded_url}&{DEFINITIONS_QUERY_NAME}={encoded_definitions}"
-        ))
+        href.push_str(&format!("&{DEFINITIONS_QUERY_NAME}={encoded_definitions}"));
     }
+    Some(href)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn media_segment_href(
     base_url: Url,
     segment_uri: &str,
@@ -181,6 +185,7 @@ fn media_segment_href(
     byterange: Option<RequestRange>,
     segment_type: SegmentType,
     definitions_query_value: Option<String>,
+    init_url_query_value: Option<&str>,
     local_definitions: &HashMap<String, String>,
 ) -> Option<String> {
     let segment_uri = replace_hls_variables(segment_uri, local_definitions);
@@ -194,27 +199,18 @@ fn media_segment_href(
             encode_part(segment_url_as_str, media_sequence, part_index, byterange)
         }
     };
+    let mut href = format!(
+        "?{PLAYLIST_URL_QUERY_NAME}={query_encoded_base_url}&{SUPPLEMENTAL_VIEW_QUERY_NAME}={encoded_supplemental_context}"
+    );
     if let Some(definitions_query_value) = definitions_query_value {
-        #[allow(clippy::uninlined_format_args)] // The line is too long when inlining the variables
-        Some(format!(
-            "?{}={}&{}={}&{}={}",
-            PLAYLIST_URL_QUERY_NAME,
-            query_encoded_base_url,
-            DEFINITIONS_QUERY_NAME,
-            definitions_query_value,
-            SUPPLEMENTAL_VIEW_QUERY_NAME,
-            encoded_supplemental_context,
-        ))
-    } else {
-        #[allow(clippy::uninlined_format_args)] // The line is too long when inlining the variables
-        Some(format!(
-            "?{}={}&{}={}",
-            PLAYLIST_URL_QUERY_NAME,
-            query_encoded_base_url,
-            SUPPLEMENTAL_VIEW_QUERY_NAME,
-            encoded_supplemental_context,
-        ))
+        href.push_str(&format!(
+            "&{DEFINITIONS_QUERY_NAME}={definitions_query_value}"
+        ));
     }
+    if let Some(init_url_query_value) = init_url_query_value {
+        href.push_str(&format!("&{INIT_URL_QUERY_NAME}={init_url_query_value}"));
+    }
+    Some(href)
 }
 
 fn media_scte35_href(
@@ -226,25 +222,13 @@ fn media_scte35_href(
 ) -> String {
     let query_encoded_base_url = percent_encode(base_url.as_str());
     let encoded_supplemental_context = encode_scte35(scte35_message, daterange_id, command_type);
+    let mut href = format!(
+        "?{PLAYLIST_URL_QUERY_NAME}={query_encoded_base_url}&{SUPPLEMENTAL_VIEW_QUERY_NAME}={encoded_supplemental_context}"
+    );
     if let Some(definitions) = definitions_query_value {
-        format!(
-            "?{}={}&{}={}&{}={}",
-            PLAYLIST_URL_QUERY_NAME,
-            query_encoded_base_url,
-            DEFINITIONS_QUERY_NAME,
-            definitions,
-            SUPPLEMENTAL_VIEW_QUERY_NAME,
-            encoded_supplemental_context,
-        )
-    } else {
-        format!(
-            "?{}={}&{}={}",
-            PLAYLIST_URL_QUERY_NAME,
-            query_encoded_base_url,
-            SUPPLEMENTAL_VIEW_QUERY_NAME,
-            encoded_supplemental_context,
-        )
+        href.push_str(&format!("&{DEFINITIONS_QUERY_NAME}={definitions}"));
     }
+    href
 }
 
 fn json_href<F>(
@@ -263,25 +247,15 @@ where
     let query_encoded_base_url = percent_encode(base_url.as_str());
     let url_as_str = absolute_url.as_str();
     let encoded_supplemental_context = encode(url_as_str, daterange_id);
+    let mut href = format!(
+        "?{PLAYLIST_URL_QUERY_NAME}={query_encoded_base_url}&{SUPPLEMENTAL_VIEW_QUERY_NAME}={encoded_supplemental_context}"
+    );
     if let Some(definitions_query_value) = definitions_query_value {
-        Some(format!(
-            "?{}={}&{}={}&{}={}",
-            PLAYLIST_URL_QUERY_NAME,
-            query_encoded_base_url,
-            DEFINITIONS_QUERY_NAME,
-            definitions_query_value,
-            SUPPLEMENTAL_VIEW_QUERY_NAME,
-            encoded_supplemental_context,
-        ))
-    } else {
-        Some(format!(
-            "?{}={}&{}={}",
-            PLAYLIST_URL_QUERY_NAME,
-            query_encoded_base_url,
-            SUPPLEMENTAL_VIEW_QUERY_NAME,
-            encoded_supplemental_context,
-        ))
+        href.push_str(&format!(
+            "&{DEFINITIONS_QUERY_NAME}={definitions_query_value}"
+        ));
     }
+    Some(href)
 }
 
 fn replace_hls_variables<'a>(
@@ -379,6 +353,7 @@ mod tests {
                 None,
                 SegmentType::Segment,
                 None,
+                None,
                 &HashMap::new()
             )
         );
@@ -394,6 +369,7 @@ mod tests {
                 100,
                 None,
                 SegmentType::Map,
+                None,
                 None,
                 &HashMap::new()
             )
@@ -411,7 +387,127 @@ mod tests {
                 None,
                 SegmentType::Part { part_index: 2 },
                 None,
+                None,
                 &HashMap::new()
+            )
+        );
+    }
+
+    #[test]
+    fn segment_href_includes_init_url_when_provided() {
+        let base_url = Url::parse("https://example.com/hls/hi/media.m3u8").unwrap();
+        let uri = "segment-100.mp4";
+        let init_url_query_value = "0,-,https://example.com/hls/hi/init.mp4";
+
+        assert_eq!(
+            Some(format!(
+                "?{}={}&{}={}&{}={}",
+                PLAYLIST_URL_QUERY_NAME,
+                "https://example.com/hls/hi/media.m3u8",
+                SUPPLEMENTAL_VIEW_QUERY_NAME,
+                "SEGMENT,100,-,https://example.com/hls/hi/segment-100.mp4",
+                INIT_URL_QUERY_NAME,
+                init_url_query_value,
+            )),
+            media_segment_href(
+                base_url.clone(),
+                uri,
+                100,
+                None,
+                SegmentType::Segment,
+                None,
+                Some(init_url_query_value),
+                &HashMap::new()
+            )
+        );
+    }
+
+    #[test]
+    fn part_href_includes_init_url_when_provided() {
+        let base_url = Url::parse("https://example.com/hls/hi/media.m3u8").unwrap();
+        let uri = "part-100.0.mp4";
+        let init_url_query_value = "0,-,https://example.com/hls/hi/init.mp4";
+
+        assert_eq!(
+            Some(format!(
+                "?{}={}&{}={}&{}={}",
+                PLAYLIST_URL_QUERY_NAME,
+                "https://example.com/hls/hi/media.m3u8",
+                SUPPLEMENTAL_VIEW_QUERY_NAME,
+                "PART,0,100,-,https://example.com/hls/hi/part-100.0.mp4",
+                INIT_URL_QUERY_NAME,
+                init_url_query_value,
+            )),
+            media_segment_href(
+                base_url.clone(),
+                uri,
+                100,
+                None,
+                SegmentType::Part { part_index: 0 },
+                None,
+                Some(init_url_query_value),
+                &HashMap::new()
+            )
+        );
+    }
+
+    #[test]
+    fn map_href_never_includes_init_url() {
+        let base_url = Url::parse("https://example.com/hls/hi/media.m3u8").unwrap();
+        let uri = "init.mp4";
+
+        // Map uses None for init_url since the map *is* the init segment.
+        assert_eq!(
+            Some(format!(
+                "?{}={}&{}={}",
+                PLAYLIST_URL_QUERY_NAME,
+                "https://example.com/hls/hi/media.m3u8",
+                SUPPLEMENTAL_VIEW_QUERY_NAME,
+                "MAP,100,-,https://example.com/hls/hi/init.mp4",
+            )),
+            media_segment_href(
+                base_url.clone(),
+                uri,
+                100,
+                None,
+                SegmentType::Map,
+                None,
+                None,
+                &HashMap::new()
+            )
+        );
+    }
+
+    #[test]
+    fn segment_href_with_init_url_and_definitions() {
+        let base_url = Url::parse("https://example.com/hls/media.m3u8").unwrap();
+        let definitions =
+            HashMap::from([(String::from("DOMAIN"), String::from("https://cdn.com"))]);
+        let uri = "{$DOMAIN}/hi/segment-100.mp4";
+        let query_definitions = String::from("DOMAIN%3Dhttps://cdn.com");
+        let init_url_query_value = "0,-,https://cdn.com/hi/init.mp4";
+
+        assert_eq!(
+            Some(format!(
+                "?{}={}&{}={}&{}={}&{}={}",
+                PLAYLIST_URL_QUERY_NAME,
+                "https://example.com/hls/media.m3u8",
+                SUPPLEMENTAL_VIEW_QUERY_NAME,
+                "SEGMENT,100,-,https://cdn.com/hi/segment-100.mp4",
+                DEFINITIONS_QUERY_NAME,
+                query_definitions,
+                INIT_URL_QUERY_NAME,
+                init_url_query_value,
+            )),
+            media_segment_href(
+                base_url,
+                uri,
+                100,
+                None,
+                SegmentType::Segment,
+                Some(query_definitions),
+                Some(init_url_query_value),
+                &definitions
             )
         );
     }
@@ -479,10 +575,10 @@ mod tests {
                 "?{}={}&{}={}&{}={}",
                 PLAYLIST_URL_QUERY_NAME,
                 "https://example.com/hls/media.m3u8",
+                SUPPLEMENTAL_VIEW_QUERY_NAME,
+                "SEGMENT,100,-,https://cdn.com/hi/segment-100.mp4?token%3D1234",
                 DEFINITIONS_QUERY_NAME,
                 "DOMAIN%3Dhttps://cdn.com",
-                SUPPLEMENTAL_VIEW_QUERY_NAME,
-                "SEGMENT,100,-,https://cdn.com/hi/segment-100.mp4?token%3D1234"
             )),
             media_segment_href(
                 base_url.clone(),
@@ -491,6 +587,7 @@ mod tests {
                 None,
                 SegmentType::Segment,
                 Some(query_definitions.clone()),
+                None,
                 &local_definitions
             )
         );
@@ -499,10 +596,10 @@ mod tests {
                 "?{}={}&{}={}&{}={}",
                 PLAYLIST_URL_QUERY_NAME,
                 "https://example.com/hls/media.m3u8",
+                SUPPLEMENTAL_VIEW_QUERY_NAME,
+                "MAP,100,-,https://cdn.com/hi/segment-100.mp4?token%3D1234",
                 DEFINITIONS_QUERY_NAME,
                 "DOMAIN%3Dhttps://cdn.com",
-                SUPPLEMENTAL_VIEW_QUERY_NAME,
-                "MAP,100,-,https://cdn.com/hi/segment-100.mp4?token%3D1234"
             )),
             media_segment_href(
                 base_url.clone(),
@@ -511,6 +608,7 @@ mod tests {
                 None,
                 SegmentType::Map,
                 Some(query_definitions.clone()),
+                None,
                 &local_definitions
             )
         );
@@ -519,10 +617,10 @@ mod tests {
                 "?{}={}&{}={}&{}={}",
                 PLAYLIST_URL_QUERY_NAME,
                 "https://example.com/hls/media.m3u8",
+                SUPPLEMENTAL_VIEW_QUERY_NAME,
+                "PART,0,100,-,https://cdn.com/hi/segment-100.mp4?token%3D1234",
                 DEFINITIONS_QUERY_NAME,
                 "DOMAIN%3Dhttps://cdn.com",
-                SUPPLEMENTAL_VIEW_QUERY_NAME,
-                "PART,0,100,-,https://cdn.com/hi/segment-100.mp4?token%3D1234"
             )),
             media_segment_href(
                 base_url.clone(),
@@ -531,6 +629,7 @@ mod tests {
                 None,
                 SegmentType::Part { part_index: 0 },
                 Some(query_definitions.clone()),
+                None,
                 &local_definitions
             )
         );
@@ -539,10 +638,10 @@ mod tests {
                 "?{}={}&{}={}&{}={}",
                 PLAYLIST_URL_QUERY_NAME,
                 "https://example.com/hls/media.m3u8",
+                SUPPLEMENTAL_VIEW_QUERY_NAME,
+                "ASSET_LIST,EXAMPLE%20ID%22https://cdn.com/hi/segment-100.mp4?token%3D1234",
                 DEFINITIONS_QUERY_NAME,
                 "DOMAIN%3Dhttps://cdn.com",
-                SUPPLEMENTAL_VIEW_QUERY_NAME,
-                "ASSET_LIST,EXAMPLE%20ID%22https://cdn.com/hi/segment-100.mp4?token%3D1234"
             )),
             json_href(
                 base_url.clone(),
@@ -558,10 +657,10 @@ mod tests {
                 "?{}={}&{}={}&{}={}",
                 PLAYLIST_URL_QUERY_NAME,
                 "https://example.com/hls/media.m3u8",
+                SUPPLEMENTAL_VIEW_QUERY_NAME,
+                "DATERANGE_SCHEDULE,EXAMPLE%20ID%22https://cdn.com/hi/segment-100.mp4?token%3D1234",
                 DEFINITIONS_QUERY_NAME,
                 "DOMAIN%3Dhttps://cdn.com",
-                SUPPLEMENTAL_VIEW_QUERY_NAME,
-                "DATERANGE_SCHEDULE,EXAMPLE%20ID%22https://cdn.com/hi/segment-100.mp4?token%3D1234"
             )),
             json_href(
                 base_url,
@@ -596,6 +695,7 @@ mod tests {
                 None,
                 SegmentType::Segment,
                 None,
+                None,
                 &local_definitions
             )
         );
@@ -614,6 +714,7 @@ mod tests {
                 None,
                 SegmentType::Map,
                 None,
+                None,
                 &local_definitions
             )
         );
@@ -631,6 +732,7 @@ mod tests {
                 100,
                 None,
                 SegmentType::Part { part_index: 0 },
+                None,
                 None,
                 &local_definitions
             )
@@ -667,10 +769,10 @@ mod tests {
                 "?{}={}&{}={}&{}={}",
                 PLAYLIST_URL_QUERY_NAME,
                 base_url,
-                DEFINITIONS_QUERY_NAME,
-                definitions,
                 SUPPLEMENTAL_VIEW_QUERY_NAME,
                 format!("SCTE35,CMD,%26id%3D123%22{SCTE35_OUT_MESSAGE}"),
+                DEFINITIONS_QUERY_NAME,
+                definitions,
             ),
             media_scte35_href(
                 Url::parse(base_url).unwrap(),

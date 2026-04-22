@@ -10,7 +10,7 @@ use crate::{
             resolve_playlist_relative_url, scte35_href, segment_href,
         },
         network::RequestRange,
-        query_codec::Scte35CommandType,
+        query_codec::{Scte35CommandType, encode_init_url},
     },
 };
 use leptos::{either::EitherOf3, prelude::*};
@@ -207,6 +207,7 @@ fn uri_line(uri: &str, state: &mut ParsingState) {
                     media_sequence: state.media_sequence,
                     byterange,
                     definitions: &state.local_definitions,
+                    init_url_query_value: state.current_init_url_query_value.as_deref(),
                 })
                 class=uri_class
             >
@@ -240,6 +241,7 @@ fn playlist_uri_tag(tag: &UnknownTag, state: &mut ParsingState) {
                 media_sequence: state.media_sequence,
                 byterange: None,
                 definitions: &state.local_definitions,
+                init_url_query_value: None,
             })
         },
         |_, _| false,
@@ -249,6 +251,25 @@ fn playlist_uri_tag(tag: &UnknownTag, state: &mut ParsingState) {
 
 fn x_map(tag: &UnknownTag, state: &mut ParsingState) {
     let byterange = map_byterange(tag).map(RequestRange::from);
+
+    // Extract and store the resolved init segment URL for use in segment/part hrefs.
+    if let Some(list) = tag
+        .value()
+        .and_then(|v| v.try_as_ordered_attribute_list().ok())
+        && let Some((_, uri_value)) = list.iter().find(|(k, _)| *k == "URI")
+    {
+        let uri_str = match uri_value {
+            AttributeValue::Quoted(s) => s,
+            AttributeValue::Unquoted(v) => std::str::from_utf8(v.0).unwrap_or(""),
+        };
+        if let Some(absolute_url) =
+            resolve_playlist_relative_url(uri_str, &state.local_definitions)
+        {
+            state.current_init_url_query_value =
+                Some(encode_init_url(&absolute_url, byterange));
+        }
+    }
+
     let markup = split_tag_as_markup(
         tag,
         ["URI"],
@@ -259,6 +280,7 @@ fn x_map(tag: &UnknownTag, state: &mut ParsingState) {
                 media_sequence: state.media_sequence,
                 byterange,
                 definitions: &state.local_definitions,
+                init_url_query_value: state.current_init_url_query_value.as_deref(),
             })
         },
         |_, value| {
@@ -351,6 +373,7 @@ fn x_part(tag: &UnknownTag, state: &mut ParsingState) {
                 media_sequence: state.media_sequence,
                 byterange,
                 definitions: &state.local_definitions,
+                init_url_query_value: state.current_init_url_query_value.as_deref(),
             })
         },
         |_, _| is_highlighted,
@@ -485,13 +508,16 @@ fn resolve_href(opts: ResolveOptions) -> Option<String> {
         media_sequence,
         byterange,
         definitions,
+        init_url_query_value,
     } = opts;
     match uri_type {
         UriType::Playlist => media_playlist_href(uri, definitions),
-        UriType::Segment => segment_href(uri, media_sequence, byterange, definitions),
+        UriType::Segment => {
+            segment_href(uri, media_sequence, byterange, definitions, init_url_query_value)
+        }
         UriType::Map => map_href(uri, media_sequence, byterange, definitions),
         UriType::Part { part_index } => {
-            part_href(uri, media_sequence, part_index, byterange, definitions)
+            part_href(uri, media_sequence, part_index, byterange, definitions, init_url_query_value)
         }
     }
 }
@@ -664,6 +690,9 @@ struct ParsingState {
     media_sequence: u64,
     part_index: u32,
     is_media_playlist: bool,
+    /// The resolved absolute URL of the currently-active `EXT-X-MAP` init segment (with optional
+    /// byterange encoded), so that segment/part hrefs can carry it as the `init_url` query param.
+    current_init_url_query_value: Option<String>,
     highlighted_one_map: bool,
     offset_after_last_segment_byterange: u64,
     offset_after_last_part_byterange: u64,
@@ -748,6 +777,7 @@ impl ParsingState {
             media_sequence: Default::default(),
             part_index: Default::default(),
             is_media_playlist: Default::default(),
+            current_init_url_query_value: Default::default(),
             highlighted_one_map: Default::default(),
             offset_after_last_segment_byterange: Default::default(),
             offset_after_last_part_byterange: Default::default(),
@@ -770,6 +800,7 @@ struct ResolveOptions<'a> {
     media_sequence: u64,
     byterange: Option<RequestRange>,
     definitions: &'a HashMap<String, String>,
+    init_url_query_value: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq)]

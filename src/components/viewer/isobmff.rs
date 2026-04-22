@@ -1,29 +1,39 @@
 use crate::{
     components::viewer::ISOBMFF_VIEW_CLASS,
-    utils::mp4_atom_properties::{
-        AtomProperties, AtomPropertyValue, BasicPropertyValue, TablePropertyValue, get_properties,
+    utils::{
+        cea608::{self, CaptionEntry, CodecType},
+        mp4_atom_properties::{
+            get_properties, AtomProperties, AtomPropertyValue, BasicPropertyValue,
+            TablePropertyValue,
+        },
     },
 };
 use leptos::{
     either::{Either, EitherOf3},
     prelude::*,
 };
-use mp4_atom::{Buf, FourCC, Header, ReadFrom};
-use std::{borrow::Cow, io::Cursor};
+use mp4_atom::{Atom, Avcc, Buf, FourCC, Header, Hvcc, ReadFrom};
+use std::{borrow::Cow, io::Cursor, sync::Arc};
 use web_sys::MouseEvent;
 
 const ATOMS_CLASS: &str = "mp4-atoms";
 const PROPERTIES_CLASS: &str = "mp4-properties";
 const INNER_TABLE_CLASS: &str = "mp4-inner-table";
+const CAPTIONS_SECTION_CLASS: &str = "mp4-captions";
 
 #[component]
-pub fn IsobmffViewer(data: Vec<u8>) -> mp4_atom::Result<impl IntoView> {
+pub fn IsobmffViewer(
+    data: Vec<u8>,
+    init_segment_data: Option<Vec<u8>>,
+) -> mp4_atom::Result<impl IntoView> {
     let (highlighted, set_highlighted) = signal(0);
-    let mut reader = Cursor::new(data);
+    let data_arc = Arc::new(data);
+    let mut reader = Cursor::new(data_arc.as_ref().clone());
     let mut atoms = Vec::new();
     let mut properties = Vec::new();
     let mut index = 0usize;
     let mut container_box_end_positions = Vec::new();
+    let mut mdat_ranges: Vec<(usize, usize, usize)> = Vec::new();
     loop {
         let header = Header::read_from(&mut reader)?;
         // Handle popping out of depths when we have reached the end of container boxes. Multiple
@@ -60,8 +70,14 @@ pub fn IsobmffViewer(data: Vec<u8>) -> mp4_atom::Result<impl IntoView> {
         // info) because a new container box should still appear at the same depth as its sibling
         // boxes.
         let depth = container_box_end_positions.len();
+        let is_mdat = header.kind == FourCC::new(b"mdat");
+        let body_start = reader.position() as usize;
         // We then get the property information for this box.
         let info = get_properties(&header, &mut reader)?;
+        let body_end = reader.position() as usize;
+        if is_mdat {
+            mdat_ranges.push((index, body_start, body_end));
+        }
         // If the new info is a container box then we will receive a new "depth until" that
         // indicates at what reader position this box will end at. Above we handle tracking how deep
         // we are into any given box and at what size the box ends.
@@ -91,10 +107,36 @@ pub fn IsobmffViewer(data: Vec<u8>) -> mp4_atom::Result<impl IntoView> {
         }
         index += 1;
     }
+
+    // Build caption sections for each mdat when init segment data is available.
+    // The "Parse Captions" button visibility is determined by whether valid codec
+    // configuration can be extracted from the init segment data.
+    let caption_views: Vec<AnyView> = if init_segment_data.is_some() {
+        let init_data_arc = Arc::new(init_segment_data);
+        mdat_ranges
+            .into_iter()
+            .map(|(mdat_index, body_start, body_end)| {
+                let mdat_body = data_arc[body_start..body_end].to_vec();
+                let init_data = init_data_arc.clone();
+                view! {
+                    <Show when=move || highlighted.get() == mdat_index>
+                        <CaptionParser
+                            mdat_body=mdat_body.clone()
+                            init_segment_data=init_data.as_ref().clone()
+                        />
+                    </Show>
+                }
+                .into_any()
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     Ok(view! {
         <div class=ISOBMFF_VIEW_CLASS>
             <div class=ATOMS_CLASS>{atoms}</div>
-            <div class=PROPERTIES_CLASS>{properties}</div>
+            <div class=PROPERTIES_CLASS>{properties} {caption_views}</div>
         </div>
     })
 }
@@ -211,4 +253,181 @@ fn view_from_prop(
     } else {
         Either::Right(view! { {string} })
     }
+}
+
+/// Component that shows a "Parse Captions" button on mdat when valid codec config
+/// can be extracted from the init segment data. On click, parses captions synchronously.
+#[component]
+fn CaptionParser(mdat_body: Vec<u8>, init_segment_data: Option<Vec<u8>>) -> impl IntoView {
+    let codec_config = init_segment_data.as_deref().and_then(extract_codec_config);
+
+    // Only show the Parse Captions button if we could extract a valid codec config.
+    let Some((nal_length_size, codec_type)) = codec_config else {
+        return Either::Left(());
+    };
+
+    let (captions, set_captions) = signal::<Option<Vec<CaptionEntry>>>(None);
+    let mdat_body = Arc::new(mdat_body);
+
+    Either::Right(view! {
+        <div class=CAPTIONS_SECTION_CLASS>
+            <Show when=move || {
+                captions.get().is_none()
+            }>
+                {
+                    let mdat_body = mdat_body.clone();
+                    view! {
+                        <button on:click=move |_| {
+                            let entries = cea608::extract_captions(
+                                &mdat_body,
+                                nal_length_size,
+                                codec_type,
+                            );
+                            set_captions.set(Some(entries));
+                        }>"Parse Captions"</button>
+                    }
+                }
+            </Show>
+            <Show when=move || captions.get().is_some()>
+                <CaptionTable entries=captions.get().unwrap_or_default() />
+            </Show>
+        </div>
+    })
+}
+
+/// Extract NAL length size and codec type from an init segment's moov/trak/mdia/minf/stbl/stsd.
+fn extract_codec_config(init_data: &[u8]) -> Option<(u8, CodecType)> {
+    const MOOV: FourCC = FourCC::new(b"moov");
+    const TRAK: FourCC = FourCC::new(b"trak");
+    const MDIA: FourCC = FourCC::new(b"mdia");
+    const MINF: FourCC = FourCC::new(b"minf");
+    const STBL: FourCC = FourCC::new(b"stbl");
+    const STSD: FourCC = FourCC::new(b"stsd");
+    const AVC1: FourCC = FourCC::new(b"avc1");
+    const AVC3: FourCC = FourCC::new(b"avc3");
+    const HEV1: FourCC = FourCC::new(b"hev1");
+    const HVC1: FourCC = FourCC::new(b"hvc1");
+    const DVH1: FourCC = FourCC::new(b"dvh1");
+    const DVHE: FourCC = FourCC::new(b"dvhe");
+    const ENCV: FourCC = FourCC::new(b"encv");
+    const SINF: FourCC = FourCC::new(b"sinf");
+    const AVCC: FourCC = FourCC::new(b"avcC");
+    const HVCC: FourCC = FourCC::new(b"hvcC");
+    const HVCE: FourCC = FourCC::new(b"hvcE");
+
+    let mut reader = Cursor::new(init_data.to_vec());
+    while reader.has_remaining() {
+        let Ok(header) = Header::read_from(&mut reader) else {
+            break;
+        };
+        let body_size = header.size.unwrap_or(reader.remaining());
+        let body_end = reader.position() + body_size as u64;
+        match header.kind {
+            // Container boxes: descend into them
+            MOOV | TRAK | MDIA | MINF | STBL => continue,
+            STSD => {
+                // Skip version(4) + entry_count(4) to get to sample entries
+                if reader.remaining() >= 8 {
+                    reader.set_position(reader.position() + 8);
+                }
+                continue;
+            }
+            // AVC sample entries - skip 78 bytes of VisualSampleEntry fields
+            AVC1 | AVC3 => {
+                let skip = 78.min(reader.remaining());
+                reader.set_position(reader.position() + skip as u64);
+                continue;
+            }
+            // HEVC sample entries
+            HEV1 | HVC1 | DVH1 | DVHE => {
+                let skip = 78.min(reader.remaining());
+                reader.set_position(reader.position() + skip as u64);
+                continue;
+            }
+            // Encrypted video sample entry — same VisualSampleEntry layout,
+            // wraps the original codec config boxes (avcC/hvcC/hvcE) plus sinf
+            ENCV => {
+                let skip = 78.min(reader.remaining());
+                reader.set_position(reader.position() + skip as u64);
+                continue;
+            }
+            // sinf is a container box (SchemeInformationBox) — skip it
+            SINF => {
+                reader.set_position(body_end.min(init_data.len() as u64));
+                continue;
+            }
+            AVCC => {
+                if let Ok(avcc) = Avcc::decode_body(&mut reader) {
+                    return Some((avcc.length_size, CodecType::H264));
+                }
+            }
+            HVCC | HVCE => {
+                if let Ok(hvcc) = Hvcc::decode_body(&mut reader) {
+                    return Some((hvcc.length_size_minus_one + 1, CodecType::H265));
+                }
+            }
+            _ => {
+                // Skip unknown boxes
+                reader.set_position(body_end.min(init_data.len() as u64));
+            }
+        }
+    }
+    None
+}
+
+#[component]
+fn CaptionTable(entries: Vec<CaptionEntry>) -> impl IntoView {
+    if entries.is_empty() {
+        return Either::Left(view! { <p>"No caption data found in this mdat."</p> });
+    }
+
+    let text_entries: Vec<_> = entries
+        .iter()
+        .filter_map(|e| e.text.as_ref().map(|t| (e.nal_index, e.field, t.clone())))
+        .collect();
+
+    Either::Right(view! {
+        <div>
+            <p>
+                {format!(
+                    "Found {} cc_data entries ({} with text)",
+                    entries.len(),
+                    text_entries.len(),
+                )}
+            </p>
+            <table class=INNER_TABLE_CLASS>
+                <tr>
+                    <th>"NAL"</th>
+                    <th>"Field"</th>
+                    <th>"cc_type"</th>
+                    <th>"Data"</th>
+                    <th>"Text"</th>
+                </tr>
+                {entries
+                    .iter()
+                    .map(|entry| {
+                        view! {
+                            <tr>
+                                <td>{entry.nal_index}</td>
+                                <td>
+                                    {match entry.field {
+                                        1 => "CC1",
+                                        2 => "CC2",
+                                        _ => "DTVCC",
+                                    }}
+                                </td>
+                                <td>{entry.cc_type}</td>
+                                <td>
+                                    <pre>
+                                        {format!("{:02X} {:02X}", entry.cc_data1, entry.cc_data2)}
+                                    </pre>
+                                </td>
+                                <td>{entry.text.clone().unwrap_or_default()}</td>
+                            </tr>
+                        }
+                    })
+                    .collect_view()}
+            </table>
+        </div>
+    })
 }

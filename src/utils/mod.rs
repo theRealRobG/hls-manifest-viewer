@@ -1,4 +1,5 @@
 mod bitter;
+pub mod cea608;
 pub mod hex;
 pub mod href;
 pub mod mp4_atom_properties;

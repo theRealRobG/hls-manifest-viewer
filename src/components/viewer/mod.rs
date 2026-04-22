@@ -10,12 +10,12 @@ mod scte35;
 use crate::{
     components::viewer::daterange_schedule::DaterangeScheduleView,
     utils::{
-        network::{FetchError, FetchTextResponse, RequestRange, fetch_array_buffer, fetch_text},
+        network::{fetch_array_buffer, fetch_text, FetchError, FetchTextResponse, RequestRange},
         query_codec::{
             AssetListContext, DaterangeScheduleContext, MediaSegmentContext, PartSegmentContext,
             SupplementalViewQueryContext,
         },
-        response::{SegmentType, determine_segment_type},
+        response::{determine_segment_type, SegmentType},
     },
 };
 use asset_list::AssetListView;
@@ -51,6 +51,7 @@ pub fn Viewer(
     fetch_response: Result<FetchTextResponse, FetchError>,
     supplemental_context: Option<String>,
     imported_definitions: HashMap<String, String>,
+    init_url_context: Option<String>,
 ) -> impl IntoView {
     let FetchTextResponse {
         response_text: playlist,
@@ -92,6 +93,9 @@ pub fn Viewer(
             };
         }
     };
+    // Parse the init_url query parameter into a MediaSegmentContext if present.
+    let init_context =
+        init_url_context.and_then(|raw| MediaSegmentContext::try_from(raw.as_str()).ok());
     match context {
         SupplementalViewQueryContext::AssetList(asset_list_context) => {
             let AssetListContext { url, daterange_id } = asset_list_context;
@@ -171,7 +175,11 @@ pub fn Viewer(
                             }
                         />
                     </ErrorBounded>
-                    <SupplementalSegmentView segment_url=url.clone() byterange />
+                    <SupplementalSegmentView
+                        segment_url=url.clone()
+                        byterange
+                        init_context=init_context.clone()
+                    />
                 </Container>
             }
         }
@@ -196,7 +204,11 @@ pub fn Viewer(
                             }
                         />
                     </ErrorBounded>
-                    <SupplementalSegmentView segment_url=url_for_segment_viewer byterange />
+                    <SupplementalSegmentView
+                        segment_url=url_for_segment_viewer
+                        byterange
+                        init_context=None
+                    />
                 </Container>
             }
         }
@@ -223,7 +235,11 @@ pub fn Viewer(
                             }
                         />
                     </ErrorBounded>
-                    <SupplementalSegmentView segment_url=url byterange />
+                    <SupplementalSegmentView
+                        segment_url=url
+                        byterange
+                        init_context=init_context.clone()
+                    />
                 </Container>
             }
         }
@@ -253,15 +269,33 @@ fn Container(children: Children) -> impl IntoView {
 }
 
 #[component]
-fn SupplementalSegmentView(segment_url: String, byterange: Option<RequestRange>) -> impl IntoView {
+fn SupplementalSegmentView(
+    segment_url: String,
+    byterange: Option<RequestRange>,
+    init_context: Option<MediaSegmentContext>,
+) -> impl IntoView {
     let segment_result =
         LocalResource::new(move || fetch_array_buffer(segment_url.clone(), byterange));
+
+    // Fetch the init segment if an init_context is provided and its URL differs from the
+    // media segment (avoids redundant fetches when viewing the init segment itself).
+    let init_result = init_context.map(|ctx| {
+        let url = ctx.url;
+        let byterange = ctx.byterange;
+        LocalResource::new(move || fetch_array_buffer(url.clone(), byterange))
+    });
+
     view! {
         <Suspense fallback=|| {
             view! { <div class=SUPPLEMENTAL_VIEW_CLASS>"Loading..."</div> }
         }>
             <ErrorBounded>
                 {move || {
+                    let init_data = init_result
+                        .as_ref()
+                        .and_then(|r| r.get())
+                        .and_then(|res| res.ok())
+                        .map(|r| r.response_body);
                     segment_result
                         .get()
                         .map(|fetch_response| {
@@ -278,7 +312,13 @@ fn SupplementalSegmentView(segment_url: String, byterange: Option<RequestRange>)
                                                 .into_any()
                                         }
                                         SegmentType::Mp4 => {
-                                            view! { <IsobmffViewer data=r.response_body /> }.into_any()
+                                            view! {
+                                                <IsobmffViewer
+                                                    data=r.response_body
+                                                    init_segment_data=init_data.clone()
+                                                />
+                                            }
+                                                .into_any()
                                         }
                                         SegmentType::Unknown => {
                                             view! {

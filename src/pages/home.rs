@@ -2,8 +2,8 @@ use crate::{
     components::{UrlInputForm, Viewer, ViewerLoading},
     utils::{
         href::{
-            DEFINITIONS_QUERY_NAME, PLAYLIST_URL_QUERY_NAME, SUPPLEMENTAL_VIEW_QUERY_NAME,
-            query_value_from_leptos_url,
+            query_value_from_leptos_url, DEFINITIONS_QUERY_NAME, INIT_URL_QUERY_NAME,
+            PLAYLIST_URL_QUERY_NAME, SUPPLEMENTAL_VIEW_QUERY_NAME,
         },
         network::fetch_text,
         query_codec::{decode_definitions, percent_decode},
@@ -18,6 +18,7 @@ pub fn Home() -> impl IntoView {
     let supplemental_context = query_string_signal(SUPPLEMENTAL_VIEW_QUERY_NAME, true);
     // definitions are decoded separately so we do not decode the raw query value.
     let imported_definitions = query_string_signal(DEFINITIONS_QUERY_NAME, false);
+    let init_url = query_string_signal(INIT_URL_QUERY_NAME, true);
     let playlist_result = LocalResource::new(move || {
         let playlist_url = playlist_url.get().unwrap_or_default();
         fetch_text(playlist_url)
@@ -34,6 +35,7 @@ pub fn Home() -> impl IntoView {
         <Suspense fallback=ViewerLoading>
             {move || {
                 let supplemental_context = move || supplemental_context.get();
+                let init_url_context = move || init_url.get();
                 let imported_definitions = move || {
                     imported_definitions
                         .get()
@@ -54,6 +56,7 @@ pub fn Home() -> impl IntoView {
                                 fetch_response
                                 supplemental_context=supplemental_context()
                                 imported_definitions=imported_definitions()
+                                init_url_context=init_url_context()
                             />
                         }
                     })

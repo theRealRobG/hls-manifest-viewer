@@ -1,5 +1,5 @@
 use crate::utils::network::RequestRange;
-use percent_encoding::{AsciiSet, CONTROLS, percent_decode_str, utf8_percent_encode};
+use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, CONTROLS};
 use std::{
     borrow::Cow, collections::HashMap, error::Error, fmt::Display, num::ParseIntError,
     str::Utf8Error,
@@ -84,6 +84,13 @@ pub fn encode_segment(url: &str, media_sequence: u64, byterange: Option<RequestR
 
 pub fn encode_map(url: &str, media_sequence: u64, byterange: Option<RequestRange>) -> String {
     percent_encode(&format!("MAP,{}", encode(url, media_sequence, byterange))).to_string()
+}
+
+/// Encode an init segment URL (and optional byterange) for the `init_url` query parameter.
+/// Uses media_sequence=0 as a placeholder since it is not meaningful for init segments.
+/// Decode with `MediaSegmentContext::try_from`.
+pub fn encode_init_url(url: &str, byterange: Option<RequestRange>) -> String {
+    percent_encode(&encode(url, 0, byterange)).to_string()
 }
 
 pub fn encode_part(
@@ -730,6 +737,68 @@ mod tests {
             encode_definitions(&definitions).as_str(),
         );
         assert_eq!(Ok(definitions), decode_definitions(&query_value));
+    }
+
+    macro_rules! assert_init_url_codec_equality {
+        ($encoded:expr, $decoded:expr, $context:expr) => {
+            let encoded = format!($encoded);
+            let decoded = format!($decoded);
+            let context = $context;
+            assert_eq!(encoded, encode_init_url(&context.url, context.byterange));
+            assert_eq!(Ok(context), MediaSegmentContext::try_from(decoded.as_str()));
+        };
+    }
+
+    #[test]
+    fn encode_decode_init_url_without_byterange() {
+        assert_init_url_codec_equality!(
+            "0,-,{URL}",
+            "0,-,{URL}",
+            MediaSegmentContext {
+                url: URL.to_string(),
+                media_sequence: 0,
+                byterange: None,
+            }
+        );
+    }
+
+    #[test]
+    fn encode_decode_init_url_with_byterange() {
+        assert_init_url_codec_equality!(
+            "0,{BYTERANGE},{URL}",
+            "0,{BYTERANGE},{URL}",
+            MediaSegmentContext {
+                url: URL.to_string(),
+                media_sequence: 0,
+                byterange: Some(BYTERANGE),
+            }
+        );
+    }
+
+    #[test]
+    fn encode_decode_init_url_with_url_needing_encoding() {
+        assert_init_url_codec_equality!(
+            "0,-,{ENCODED_STR}",
+            "0,-,{URL_ENCODING_NEEDED}",
+            MediaSegmentContext {
+                url: URL_ENCODING_NEEDED.to_string(),
+                media_sequence: 0,
+                byterange: None,
+            }
+        );
+    }
+
+    #[test]
+    fn encode_decode_init_url_with_byterange_and_url_needing_encoding() {
+        assert_init_url_codec_equality!(
+            "0,{BYTERANGE},{ENCODED_STR}",
+            "0,{BYTERANGE},{URL_ENCODING_NEEDED}",
+            MediaSegmentContext {
+                url: URL_ENCODING_NEEDED.to_string(),
+                media_sequence: 0,
+                byterange: Some(BYTERANGE),
+            }
+        );
     }
 
     fn definitions_from<const N: usize>(
