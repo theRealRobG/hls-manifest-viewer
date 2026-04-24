@@ -1,8 +1,13 @@
-//! CEA-608/708 caption extraction from H.264/H.265 SEI NAL units in mdat boxes.
+//! CEA-608/708 caption extraction from MP4 segments.
 //!
-//! This module parses NAL unit streams (using the length-prefixed format from ISO BMFF),
-//! finds SEI messages with `user_data_registered_itu_t_t35` payloads containing `cc_data`,
-//! and decodes CEA-608 character pairs into displayable text.
+//! Supports two formats:
+//! - **SEI-based** (H.264/H.265): Parses NAL unit streams from mdat, finds SEI messages
+//!   with `user_data_registered_itu_t_t35` payloads containing `cc_data`.
+//! - **Apple `c608` format**: Raw CEA-608 data in a separate track. Samples contain
+//!   `cdat` (field 1) and/or `cdt2` (field 2) boxes with cc_data byte pairs.
+
+use mp4_atom::{Atom, Buf, DecodeAtom, Header, Moof, ReadFrom, Tfhd, Traf, Trun};
+use std::io::Cursor;
 
 /// Codec type to select correct NAL unit type parsing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,6 +89,27 @@ fn is_sei_nal(nal_data: &[u8], codec: CodecType) -> bool {
     }
 }
 
+/// Remove H.264/H.265 emulation prevention bytes (0x00 0x00 0x03 → 0x00 0x00)
+/// from the RBSP to recover the raw SEI payload.
+fn remove_emulation_prevention_bytes(data: &[u8]) -> Vec<u8> {
+    let mut result = Vec::with_capacity(data.len());
+    let mut zero_count = 0u32;
+    for &b in data {
+        if zero_count == 2 && b == 0x03 {
+            // Skip the emulation prevention byte
+            zero_count = 0;
+            continue;
+        }
+        if b == 0x00 {
+            zero_count += 1;
+        } else {
+            zero_count = 0;
+        }
+        result.push(b);
+    }
+    result
+}
+
 /// Parse SEI NAL unit payload for cc_data in user_data_registered_itu_t_t35 messages.
 fn parse_sei_for_captions(
     nal_data: &[u8],
@@ -99,8 +125,9 @@ fn parse_sei_for_captions(
     if nal_data.len() <= header_len {
         return;
     }
-    let mut pos = header_len;
-    let payload = nal_data;
+    // Remove emulation prevention bytes from RBSP before parsing
+    let payload = remove_emulation_prevention_bytes(&nal_data[header_len..]);
+    let mut pos = 0;
 
     // SEI can contain multiple messages
     while pos < payload.len() {
@@ -213,6 +240,185 @@ fn parse_itu_t_t35_for_captions(data: &[u8], nal_index: usize, entries: &mut Vec
             text,
         });
     }
+}
+
+/// Extract raw CEA-608 captions from the Apple `c608` track format.
+///
+/// Parses the full segment data to find `moof`/`traf` boxes for the given `track_id`,
+/// then reads sample data from the `mdat` using `trun` offsets and sizes. Each sample
+/// contains `cdat` (field 1) and/or `cdt2` (field 2) boxes with raw cc_data byte pairs.
+pub fn extract_c608_captions(segment_data: &[u8], track_id: u32) -> Vec<CaptionEntry> {
+    let mut entries = Vec::new();
+    let mut reader = Cursor::new(segment_data.to_vec());
+    let mut sample_index = 0usize;
+
+    while reader.has_remaining() {
+        let Ok(header) = Header::read_from(&mut reader) else {
+            break;
+        };
+        let body_size = header.size.unwrap_or(reader.remaining());
+        let box_end = reader.position() + body_size as u64;
+
+        if header.kind == Moof::KIND {
+            let moof_start = reader.position() as usize - 8; // account for header
+            // Find traf boxes matching our track_id and collect sample info
+            let samples =
+                parse_moof_for_c608_samples(&mut reader, body_size, moof_start, track_id);
+            for (data_start, sample_size) in samples {
+                if data_start + sample_size <= segment_data.len() {
+                    let sample_data = &segment_data[data_start..data_start + sample_size];
+                    parse_c608_sample(sample_data, sample_index, &mut entries);
+                }
+                sample_index += 1;
+            }
+        }
+
+        reader.set_position(box_end);
+    }
+    entries
+}
+
+/// Parse a `moof` box to find `traf` entries for the given c608 track.
+/// Returns a list of (absolute_data_offset, sample_size) for each sample.
+///
+/// Advances the cursor past the moof body.
+fn parse_moof_for_c608_samples(
+    reader: &mut Cursor<Vec<u8>>,
+    moof_body_size: usize,
+    moof_start: usize,
+    track_id: u32,
+) -> Vec<(usize, usize)> {
+    let moof_end = reader.position() + moof_body_size as u64;
+
+    while reader.position() < moof_end {
+        let Ok(header) = Header::read_from(reader) else {
+            break;
+        };
+        let body_size = header.size.unwrap_or(reader.remaining());
+        let box_end = reader.position() + body_size as u64;
+
+        if header.kind == Traf::KIND
+            && let Some(samples) =
+                parse_traf_for_c608_samples(reader, body_size, moof_start, track_id)
+        {
+            return samples;
+        }
+
+        reader.set_position(box_end);
+    }
+    Vec::new()
+}
+
+/// Parse a `traf` box: check `tfhd` for track_id match, then extract sample offsets from `trun`.
+///
+/// Advances the cursor past the traf body.
+fn parse_traf_for_c608_samples(
+    reader: &mut Cursor<Vec<u8>>,
+    traf_body_size: usize,
+    moof_start: usize,
+    target_track_id: u32,
+) -> Option<Vec<(usize, usize)>> {
+    let traf_end = reader.position() + traf_body_size as u64;
+    let mut tfhd: Option<Tfhd> = None;
+    let mut truns: Vec<Trun> = Vec::new();
+
+    // Single pass: decode tfhd and collect trun boxes
+    while reader.position() < traf_end {
+        let Ok(header) = Header::read_from(reader) else {
+            break;
+        };
+        let body_size = header.size.unwrap_or(reader.remaining());
+        let box_end = reader.position() + body_size as u64;
+
+        match header.kind {
+            Tfhd::KIND => {
+                if let Ok(atom) = Tfhd::decode_atom(&header, reader)
+                    && atom.track_id == target_track_id
+                {
+                    tfhd = Some(atom);
+                }
+            }
+            Trun::KIND => {
+                if let Ok(trun) = Trun::decode_atom(&header, reader) {
+                    truns.push(trun);
+                }
+            }
+            _ => {}
+        }
+
+        reader.set_position(box_end);
+    }
+
+    let tfhd = tfhd?;
+    let default_sample_size = tfhd.default_sample_size.unwrap_or(0) as usize;
+
+    let mut samples = Vec::new();
+    for trun in truns {
+        let data_offset = trun.data_offset.unwrap_or(0);
+        let abs_data_start = (moof_start as i64 + data_offset as i64) as usize;
+        let mut current_offset = abs_data_start;
+
+        for entry in &trun.entries {
+            let sample_size = entry.size.map_or(default_sample_size, |s| s as usize);
+            samples.push((current_offset, sample_size));
+            current_offset += sample_size;
+        }
+    }
+
+    Some(samples)
+}
+
+/// Parse a single c608 sample for `cdat` (field 1) and `cdt2` (field 2) boxes.
+fn parse_c608_sample(sample_data: &[u8], sample_index: usize, entries: &mut Vec<CaptionEntry>) {
+    let mut offset = 0;
+    while offset + 8 <= sample_data.len() {
+        let box_size = read_u32_be(&sample_data[offset..]) as usize;
+        let box_type = &sample_data[offset + 4..offset + 8];
+        if box_size < 8 || offset + box_size > sample_data.len() {
+            break;
+        }
+        let body = &sample_data[offset + 8..offset + box_size];
+
+        let field = if box_type == b"cdat" {
+            1u8
+        } else if box_type == b"cdt2" {
+            2u8
+        } else {
+            offset += box_size;
+            continue;
+        };
+
+        // Body contains raw cc_data byte pairs
+        let cc_type = if field == 1 { 0 } else { 1 };
+        let mut i = 0;
+        while i + 1 < body.len() {
+            let cc_data1 = body[i];
+            let cc_data2 = body[i + 1];
+            i += 2;
+
+            // Skip padding/empty pairs
+            if cc_data1 == 0x80 && cc_data2 == 0x80 {
+                continue;
+            }
+
+            let text = decode_cea608_pair(cc_data1, cc_data2);
+
+            entries.push(CaptionEntry {
+                nal_index: sample_index,
+                field,
+                cc_type,
+                cc_data1,
+                cc_data2,
+                text,
+            });
+        }
+
+        offset += box_size;
+    }
+}
+
+fn read_u32_be(data: &[u8]) -> u32 {
+    u32::from_be_bytes([data[0], data[1], data[2], data[3]])
 }
 
 /// Decode a CEA-608 character pair into displayable text.

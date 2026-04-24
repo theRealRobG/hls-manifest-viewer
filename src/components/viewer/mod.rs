@@ -1,4 +1,5 @@
 mod asset_list;
+mod captions;
 mod daterange_schedule;
 mod error;
 mod isobmff;
