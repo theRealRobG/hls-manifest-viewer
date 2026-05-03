@@ -1,6 +1,7 @@
 mod asset_list;
 mod daterange_schedule;
 mod error;
+mod image;
 mod isobmff;
 mod loading;
 mod playlist;
@@ -10,16 +11,17 @@ mod scte35;
 use crate::{
     components::viewer::daterange_schedule::DaterangeScheduleView,
     utils::{
-        network::{FetchError, FetchTextResponse, RequestRange, fetch_array_buffer, fetch_text},
+        network::{fetch_array_buffer, fetch_text, FetchError, FetchTextResponse, RequestRange},
         query_codec::{
             AssetListContext, DaterangeScheduleContext, MediaSegmentContext, PartSegmentContext,
             SupplementalViewQueryContext,
         },
-        response::{SegmentType, determine_segment_type},
+        response::{determine_segment_type, SegmentType},
     },
 };
 use asset_list::AssetListView;
 use error::ViewerError;
+use image::ImageViewer;
 use isobmff::IsobmffViewer;
 use leptos::{either::Either, prelude::*};
 pub use loading::ViewerLoading;
@@ -32,6 +34,7 @@ const VIEWER_CLASS: &str = "viewer-content";
 const MAIN_VIEW_CLASS: &str = "viewer-main";
 const SUPPLEMENTAL_VIEW_CLASS: &str = "viewer-supplemental supplemental-active";
 const ISOBMFF_VIEW_CLASS: &str = "viewer-supplemental isobmff-view supplemental-active";
+const IMAGE_VIEW_CLASS: &str = "viewer-supplemental image-view supplemental-active";
 const MAIN_VIEW_WITH_SUPPLEMENTAL_CLASS: &str = "viewer-main supplemental-active";
 const ERROR_CONTAINER_CLASS: &str = "error-container";
 const ERROR_CLASS: &str = "error";
@@ -279,6 +282,26 @@ fn SupplementalSegmentView(segment_url: String, byterange: Option<RequestRange>)
                                         }
                                         SegmentType::Mp4 => {
                                             view! { <IsobmffViewer data=r.response_body /> }.into_any()
+                                        }
+                                        SegmentType::Image => {
+                                            if let Some(content_type) = &r.content_type {
+                                                view! {
+                                                    <ImageViewer
+                                                        contents=r.response_body
+                                                        content_type=content_type.clone()
+                                                    />
+                                                }
+                                                    .into_any()
+                                            } else {
+                                                // This case shuoldn't happen since we already
+                                                // checked the content type when determining the
+                                                // segment type.
+                                                view! {
+                                                    <ViewerError error="Error: unknown content type for image segment"
+                                                        .to_string() />
+                                                }
+                                                    .into_any()
+                                            }
                                         }
                                         SegmentType::Unknown => {
                                             view! {

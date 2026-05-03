@@ -814,6 +814,7 @@ checksum = "e712f64ec3850b98572bffac52e2c6f282b29fe6c5fa6d42334b30be438d95c1"
 name = "hls-manifest-viewer"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "bitter",
  "console_error_panic_hook",
  "console_log",

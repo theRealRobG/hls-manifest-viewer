@@ -170,6 +170,7 @@ fn try_get_lines(
                     Some(TagName::Map) => x_map(&tag, &mut parsing_state),
                     Some(TagName::Part) => x_part(&tag, &mut parsing_state),
                     Some(TagName::Daterange) => x_daterange(&tag, &mut parsing_state),
+                    None if tag.name() == "-X-IMAGE-STREAM-INF" => playlist_uri_tag(&tag, &mut parsing_state),
                     _ => parsing_state.lines.push(
                         view! { <p class=TAG_CLASS>{String::from_utf8_lossy(tag.as_bytes())}</p> }
                             .into_any(),

@@ -9,6 +9,7 @@ use crate::utils::network::FetchArrayBufferResonse;
 pub enum SegmentType {
     WebVtt,
     Mp4,
+    Image,
     Unknown,
 }
 
@@ -31,6 +32,7 @@ fn probe_content_type(content_type: &Option<String>) -> Option<SegmentType> {
         "application/mp4" => Some(SegmentType::Mp4), // IMSC1
         "text/vtt" => Some(SegmentType::WebVtt),
         "text/plain" => Some(SegmentType::WebVtt),
+        t if t.starts_with("image/") => Some(SegmentType::Image),
         _ => None,
     }
 }
