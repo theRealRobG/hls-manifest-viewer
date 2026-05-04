@@ -4,4 +4,4 @@ mod viewer;
 
 pub use copy_button::CopyButton;
 pub use url_input_form::UrlInputForm;
-pub use viewer::{Viewer, ViewerLoading};
+pub use viewer::{IsobmffViewer, Viewer, ViewerError, ViewerLoading, VIEWER_CLASS};

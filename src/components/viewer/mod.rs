@@ -20,9 +20,9 @@ use crate::{
     },
 };
 use asset_list::AssetListView;
-use error::ViewerError;
+pub use error::ViewerError;
 use image::ImageViewer;
-use isobmff::IsobmffViewer;
+pub use isobmff::IsobmffViewer;
 use leptos::{either::Either, prelude::*};
 pub use loading::ViewerLoading;
 use playlist::{Highlighted, PlaylistViewer};
@@ -30,12 +30,13 @@ use preformatted::PreformattedViewer;
 use scte35::Scte35Viewer;
 use std::collections::HashMap;
 
-const VIEWER_CLASS: &str = "viewer-content";
+pub const VIEWER_CLASS: &str = "viewer-content";
+const VIEWER_CLASS_SUPPLEMENTAL_ACTIVE: &str = "viewer-content supplemental-active";
 const MAIN_VIEW_CLASS: &str = "viewer-main";
-const SUPPLEMENTAL_VIEW_CLASS: &str = "viewer-supplemental supplemental-active";
-const ISOBMFF_VIEW_CLASS: &str = "viewer-supplemental isobmff-view supplemental-active";
-const IMAGE_VIEW_CLASS: &str = "viewer-supplemental image-view supplemental-active";
-const MAIN_VIEW_WITH_SUPPLEMENTAL_CLASS: &str = "viewer-main supplemental-active";
+const SUPPLEMENTAL_VIEW_CLASS: &str = "viewer-supplemental";
+const ISOBMFF_VIEW_CLASS: &str = "viewer-supplemental isobmff-view";
+const IMAGE_VIEW_CLASS: &str = "viewer-supplemental image-view";
+const MAIN_VIEW_WITH_SUPPLEMENTAL_CLASS: &str = "viewer-main";
 const ERROR_CONTAINER_CLASS: &str = "error-container";
 const ERROR_CLASS: &str = "error";
 const TAG_CLASS: &str = "hls-line tag";
@@ -61,7 +62,7 @@ pub fn Viewer(
         Ok(response) => response,
         Err(error) => {
             return view! {
-                <Container>
+                <Container supplemental_showing=false>
                     <ViewerError error=error.error extra_info=error.extra_info />
                 </Container>
             };
@@ -69,7 +70,7 @@ pub fn Viewer(
     };
     let Some(context) = supplemental_context else {
         return view! {
-            <Container>
+            <Container supplemental_showing=false>
                 <ErrorBounded>
                     <PlaylistViewer playlist imported_definitions />
                 </ErrorBounded>
@@ -80,7 +81,7 @@ pub fn Viewer(
         Ok(context) => context,
         Err(e) => {
             return view! {
-                <Container>
+                <Container supplemental_showing=true>
                     <ErrorBounded>
                         <PlaylistViewer playlist imported_definitions supplemental_showing=true />
                     </ErrorBounded>
@@ -99,7 +100,7 @@ pub fn Viewer(
         SupplementalViewQueryContext::AssetList(asset_list_context) => {
             let AssetListContext { url, daterange_id } = asset_list_context;
             view! {
-                <Container>
+                <Container supplemental_showing=true>
                     <ErrorBounded>
                         <PlaylistViewer
                             playlist
@@ -120,7 +121,7 @@ pub fn Viewer(
         SupplementalViewQueryContext::DaterangeSchedule(daterange_schedule_context) => {
             let DaterangeScheduleContext { url, daterange_id } = daterange_schedule_context;
             view! {
-                <Container>
+                <Container supplemental_showing=true>
                     <ErrorBounded>
                         <PlaylistViewer
                             playlist
@@ -140,7 +141,7 @@ pub fn Viewer(
             let daterange_id = scte35_context.daterange_id.clone();
             let command_type = scte35_context.command_type;
             view! {
-                <Container>
+                <Container supplemental_showing=true>
                     <ErrorBounded>
                         <PlaylistViewer
                             playlist
@@ -163,7 +164,7 @@ pub fn Viewer(
                 byterange,
             } = media_segment_context;
             view! {
-                <Container>
+                <Container supplemental_showing=true>
                     <ErrorBounded>
                         <PlaylistViewer
                             playlist
@@ -187,7 +188,7 @@ pub fn Viewer(
             let url_for_playlist_viewer = url.clone();
             let url_for_segment_viewer = url.clone();
             view! {
-                <Container>
+                <Container supplemental_showing=true>
                     <ErrorBounded>
                         <PlaylistViewer
                             playlist
@@ -214,7 +215,7 @@ pub fn Viewer(
                 byterange,
             } = segment_context;
             view! {
-                <Container>
+                <Container supplemental_showing=true>
                     <ErrorBounded>
                         <PlaylistViewer
                             playlist
@@ -251,8 +252,13 @@ fn ErrorBounded(children: Children) -> impl IntoView {
 }
 
 #[component]
-fn Container(children: Children) -> impl IntoView {
-    view! { <div class=VIEWER_CLASS>{children()}</div> }
+fn Container(children: Children, supplemental_showing: bool) -> impl IntoView {
+    let class = if supplemental_showing {
+        VIEWER_CLASS_SUPPLEMENTAL_ACTIVE
+    } else {
+        VIEWER_CLASS
+    };
+    view! { <div class=class>{children()}</div> }
 }
 
 #[component]
