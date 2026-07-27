@@ -101,17 +101,11 @@ fn dateranges_from_json(json: &str) -> Option<Vec<DaterangeAttributes>> {
                 },
             ));
         }
-        if let Some(id) = attributes
-            .iter()
-            .find_map(|(k, v)| if k == "ID" { Some(v) } else { None })
-        {
-            dateranges.push(DaterangeAttributes {
-                id: id.to_string(),
-                attributes,
-            });
-        } else {
-            return None;
-        }
+        let id = attributes.iter().find_map(|(k, v)| if k == "ID" { Some(v) } else { None })?;
+        dateranges.push(DaterangeAttributes {
+            id: id.to_string(),
+            attributes,
+        });
     }
     Some(dateranges)
 }
