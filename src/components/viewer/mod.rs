@@ -48,6 +48,7 @@ const UNDERLINED: &str = "underlined";
 const LINE_BREAK_ANYWHERE: &str = "line-break-anywhere";
 const LINE_BREAK_WORD: &str = "line-break-word";
 const SPACER_BOTTOM: &str = "spacer-bottom-large";
+const LARGER_SPACED_TABLE: &str = "larger-spaced-table";
 
 #[component]
 pub fn Viewer(

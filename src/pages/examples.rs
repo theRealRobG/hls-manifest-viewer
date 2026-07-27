@@ -166,7 +166,7 @@ const APPLE_VISION_PRO_EXAMPLES: [Example; 6] = [
     },
 ];
 // https://developer.apple.com/streaming/examples/
-const APPLE_ADVANCED_EXAMPLES: [Example; 3] = [
+const APPLE_ADVANCED_EXAMPLES: [Example; 4] = [
     Example {
         description: "BipBop, AVC + HEVC, AAC-LC + AC-3 + E-AC-3, WebVTT + CEA-608, 30fps + 60fps",
         playlist_url: "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_adv_example_hevc/master.m3u8",
@@ -174,6 +174,10 @@ const APPLE_ADVANCED_EXAMPLES: [Example; 3] = [
     Example {
         description: "Becoming You trailer (many renditions)",
         playlist_url: "https://devstreaming-cdn.apple.com/videos/streaming/examples/adv_dv_atmos/main.m3u8",
+    },
+    Example {
+        description: "Becoming You trailer with interstitials",
+        playlist_url: "https://devstreaming-cdn.apple.com/videos/streaming/examples/interstitial-sample/mvp_interstitial_sample.m3u8",
     },
     Example {
         description: "BipBop (segments addressed with EXT-X-BYTERANGE)",

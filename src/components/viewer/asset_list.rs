@@ -1,5 +1,8 @@
 use super::{SPACER_BOTTOM, SUPPLEMENTAL_VIEW_CLASS, UNDERLINED, URI_CLASS};
-use crate::{components::viewer::error::ViewerError, utils::href::media_playlist_href};
+use crate::{
+    components::viewer::{error::ViewerError, LARGER_SPACED_TABLE},
+    utils::href::media_playlist_href,
+};
 use leptos::{either::Either, prelude::*};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -29,22 +32,35 @@ pub fn AssetListView(json: String) -> impl IntoView {
                         .collect_view()}
                 </table>
                 {if let Some(skip_control) = asset_list.skip_control {
+                    let mut rows = Vec::with_capacity(3);
+                    rows.push((
+                        String::from("OFFSET"),
+                        format!("{}", skip_control.offset.unwrap_or_default()),
+                    ));
+                    if let Some(duration) = skip_control.duration {
+                        rows.push((String::from("DURATION"), format!("{duration}")));
+                    }
+                    if let Some(label_id) = &skip_control.label_id {
+                        rows.push((String::from("LABEL-ID"), label_id.clone()));
+                    }
                     Either::Left(
                         view! {
                             <p class=UNDERLINED>"SKIP-CONTROL"</p>
-                            <table class=SPACER_BOTTOM>
-                                <tr>
-                                    <td>"OFFSET"</td>
-                                    <td>{skip_control.offset}</td>
-                                </tr>
-                                <tr>
-                                    <td>"DURATION"</td>
-                                    <td>{skip_control.duration}</td>
-                                </tr>
-                                <tr>
-                                    <td>"LABEL-ID"</td>
-                                    <td>{skip_control.label_id}</td>
-                                </tr>
+                            <table class=[SPACER_BOTTOM, LARGER_SPACED_TABLE]
+                                .join(
+                                    " ",
+                                )>
+                                {rows
+                                    .into_iter()
+                                    .map(|(key, value)| {
+                                        view! {
+                                            <tr>
+                                                <td>{key}</td>
+                                                <td>{value}</td>
+                                            </tr>
+                                        }
+                                    })
+                                    .collect_view()}
                             </table>
                         },
                     )
@@ -101,7 +117,7 @@ struct AssetDescription {
 #[derive(Deserialize)]
 #[serde(rename_all = "SCREAMING-KEBAB-CASE")]
 struct SkipControl {
-    offset: u64,
-    duration: u64,
-    label_id: String,
+    offset: Option<u64>,
+    duration: Option<u64>,
+    label_id: Option<String>,
 }
