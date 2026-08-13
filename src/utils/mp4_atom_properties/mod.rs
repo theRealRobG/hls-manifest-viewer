@@ -486,6 +486,10 @@ pub fn get_properties(
         four_cc if four_cc == FourCC::new(b"enca") => {
             audio_entry(header, "EncryptedAudioSampleEntryBox", reader)
         }
+        // Apple Positional Audio Codec (APAC) — follows standard AudioSampleEntry layout
+        four_cc if four_cc == FourCC::new(b"apac") => {
+            audio_entry(header, "ApacSampleEntryBox", reader)
+        }
         mp4_atom::Mdat::KIND => {
             let remaining_box_size = header.size.unwrap_or_else(|| reader.remaining());
             reader.set_position(reader.position() + (remaining_box_size as u64));
