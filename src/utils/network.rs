@@ -35,15 +35,18 @@ impl Display for RequestRange {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct FetchTextResponse {
     pub response_text: String,
+    /// Final response URL after redirects (may differ from the request URL).
+    pub final_url: String,
+    pub content_encoding: Option<String>,
+    pub last_modified: Option<String>,
+    pub date: Option<String>,
 }
 impl FetchTextResponse {
     fn empty() -> Self {
-        Self {
-            response_text: String::new(),
-        }
+        Self::default()
     }
 }
 
@@ -75,12 +78,22 @@ pub async fn fetch_text(request_url: String) -> Result<FetchTextResponse, FetchE
         return Ok(FetchTextResponse::empty());
     }
     let response = response_from(&request_url, None).await?;
+    let final_url = response.url();
+    let content_encoding = header_get(&response, "Content-Encoding");
+    let last_modified = header_get(&response, "Last-Modified");
+    let date = header_get(&response, "Date");
     let response_text = JsFuture::from(response.text().map_err(fetch_failed)?)
         .await
         .map_err(fetch_failed)?
         .as_string()
         .expect("text() on a fetch Response must provide a String");
-    Ok(FetchTextResponse { response_text })
+    Ok(FetchTextResponse {
+        response_text,
+        final_url,
+        content_encoding,
+        last_modified,
+        date,
+    })
 }
 
 pub async fn fetch_array_buffer(
@@ -148,7 +161,11 @@ fn fetch_failed(e: JsValue) -> FetchError {
 }
 
 fn content_type_from(response: &Response) -> Option<String> {
-    response.headers().get("Content-Type").ok().flatten()
+    header_get(response, "Content-Type")
+}
+
+fn header_get(response: &Response, name: &str) -> Option<String> {
+    response.headers().get(name).ok().flatten()
 }
 
 async fn validate(response: &Response) -> Result<(), FetchError> {
