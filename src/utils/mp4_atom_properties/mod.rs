@@ -419,7 +419,13 @@ pub fn get_properties_from_atom(atom: &Any) -> AtomProperties {
         Any::Moof(_) => unimplemented!(), // MovieFragmentBox
         Any::Traf(_) => unimplemented!(), // TrackFragmentBox
         Any::Mdat(_) => unimplemented!(), // MediaDataBox
-        unknown => todo!("missing props for {unknown:?}"),
+        // A box kind this mapping has no arm for. The crate builds with
+        // `panic = "abort"`, so an init segment carrying one must not take the
+        // whole wasm module down — it is listed with no properties instead.
+        _unmapped => AtomProperties {
+            box_name: "Unknown (unhandled box parsing)",
+            properties: vec![],
+        },
     }
 }
 
@@ -485,6 +491,10 @@ pub fn get_properties(
         }
         four_cc if four_cc == FourCC::new(b"enca") => {
             audio_entry(header, "EncryptedAudioSampleEntryBox", reader)
+        }
+        // Apple Positional Audio Codec (APAC) — follows standard AudioSampleEntry layout
+        four_cc if four_cc == FourCC::new(b"apac") => {
+            audio_entry(header, "ApacSampleEntryBox", reader)
         }
         mp4_atom::Mdat::KIND => {
             let remaining_box_size = header.size.unwrap_or_else(|| reader.remaining());
@@ -768,4 +778,22 @@ fn array_string_from<T: Display>(items: &[T]) -> String {
         .map(|item| format!("{item}"))
         .collect::<Vec<String>>()
         .join(", ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Init segments come from user input and the wasm build aborts on panic, so
+    /// a box kind with no mapping has to be described rather than blow up.
+    #[test]
+    fn unmapped_box_kind_is_described_without_panicking() {
+        let header = Header {
+            kind: FourCC::new(b"zzzz"),
+            size: Some(0),
+        };
+        let mut reader = Cursor::new(Vec::new());
+        let props = get_properties(&header, &mut reader).expect("an unmapped box still decodes");
+        assert_eq!(props.properties.box_name, "Unknown (unhandled box parsing)");
+    }
 }
