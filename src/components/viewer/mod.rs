@@ -58,6 +58,7 @@ pub fn Viewer(
 ) -> impl IntoView {
     let FetchTextResponse {
         response_text: playlist,
+        ..
     } = match fetch_response {
         Ok(response) => response,
         Err(error) => {
