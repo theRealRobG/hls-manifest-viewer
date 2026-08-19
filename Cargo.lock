@@ -818,6 +818,7 @@ dependencies = [
  "bitter",
  "console_error_panic_hook",
  "console_log",
+ "futures",
  "hex-literal",
  "id3",
  "leptos",
