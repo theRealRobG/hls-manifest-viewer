@@ -10,15 +10,26 @@ leptos_router = { version = "0.8" }
 console_error_panic_hook = "0.1"
 quick-m3u8 = "0.6"
 web-sys = { version = "0.3", features = [
+    "HtmlInputElement",
     "Document",
     "Window",
     "Response",
     "DomException",
     "Headers",
+    "Performance",
     "Request",
+    # Inspect Timing: measured fetches (no-store + abort) and the browser's own
+    # Resource Timing measurement of them.
+    "RequestInit",
+    "RequestCache",
+    "AbortController",
+    "AbortSignal",
+    "PerformanceEntry",
+    "PerformanceResourceTiming",
 ] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
+futures = { version = "0.3", default-features = false, features = ["std"] }
 url = "2.5"
 percent-encoding = "2.3"
 leptos-use = { version = "0.16", features = ["use_clipboard"] }
