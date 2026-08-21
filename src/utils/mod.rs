@@ -1,12 +1,16 @@
-mod bitter;
+pub mod author;
+pub mod bitter;
 pub mod hex;
 pub mod href;
 pub mod mp4_atom_properties;
 pub mod mp4_parsing;
+pub mod mp4_probe;
 pub mod network;
 mod pssh_data;
 pub mod query_codec;
 pub mod response;
+pub mod timing;
+pub mod validator;
 
 #[cfg(test)]
 mod tests {
