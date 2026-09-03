@@ -1,7 +1,7 @@
 use crate::utils::mp4_parsing::{
-    dvcc::Dvcc, Blin, Colr, Corg, Dac3, Dac4, Dadj, Dec3, Dvvc, Equi, Fish, Frma, Hequ, Hero,
-    Hfov, Hvce, Lac4, Ldst, Lfad, Lhvc, Lnhd, Lnin, Must, Pkin, Prim, Prft, Prji, Pssh, Rdim,
-    Rect, Schm, Senc, Stri, Tenc, Uqua,
+    dvcc::Dvcc, Blin, Colr, Corg, Dac3, Dac4, Dadj, Dec3, Dvvc, Equi, Fish, Frma, Hequ, Hero, Hfov,
+    Hvce, Lac4, Ldst, Lfad, Lhvc, Lnhd, Lnin, Must, Pkin, Prft, Prim, Prji, Pssh, Rdim, Rect, Schm,
+    Senc, Stri, Tenc, Uqua,
 };
 use mp4_atom::{Any, Atom, Audio, Buf, Decode, DecodeAtom, FourCC, Header, Visual};
 use std::{borrow::Cow, fmt::Display, io::Cursor};
@@ -67,8 +67,8 @@ mod pasp;
 mod pitm;
 mod pixi;
 mod pkin;
-mod prim;
 mod prft;
+mod prim;
 mod prji;
 mod pssh;
 mod rdim;
@@ -508,21 +508,13 @@ pub fn get_properties(
         four_cc if four_cc == FourCC::new(b"vexu") => {
             container(header, "VideoExtendedUsageBox", reader)
         }
-        four_cc if four_cc == FourCC::new(b"eyes") => {
-            container(header, "StereoViewBox", reader)
-        }
+        four_cc if four_cc == FourCC::new(b"eyes") => container(header, "StereoViewBox", reader),
         four_cc if four_cc == FourCC::new(b"cams") => {
             container(header, "StereoCameraSystemBox", reader)
         }
-        four_cc if four_cc == FourCC::new(b"cmfy") => {
-            container(header, "StereoComfortBox", reader)
-        }
-        four_cc if four_cc == FourCC::new(b"proj") => {
-            container(header, "ProjectionBox", reader)
-        }
-        four_cc if four_cc == FourCC::new(b"pack") => {
-            container(header, "ViewPackingBox", reader)
-        }
+        four_cc if four_cc == FourCC::new(b"cmfy") => container(header, "StereoComfortBox", reader),
+        four_cc if four_cc == FourCC::new(b"proj") => container(header, "ProjectionBox", reader),
+        four_cc if four_cc == FourCC::new(b"pack") => container(header, "ViewPackingBox", reader),
         four_cc if four_cc == FourCC::new(b"lnsc") => {
             container(header, "CameraSystemLensCollectionBox", reader)
         }
@@ -681,6 +673,206 @@ fn container(
         properties: AtomProperties::from_static_keys(name, version_and_flags),
         new_depth_until: Some(new_depth_until),
     })
+}
+
+// The QuickTime definition on this is found here:
+// https://developer.apple.com/documentation/quicktime-file-format/timed_metadata_media
+//
+// The mebx and downloaded segment come from `hls/AivBeachWWDC_VideoVar_5/playlist.m3u8` in this
+// Apple HLS example stream:
+// https://devstreaming-cdn.apple.com/videos/streaming/examples/immersive-media/apple-immersive-video/primary.m3u8
+#[cfg(test)]
+mod tests {
+    use std::{fs::File, io::Read};
+
+    use super::*;
+    use mp4_atom::ReadFrom;
+    use pretty_assertions::assert_eq;
+
+    const MEBX: &[u8] = &[
+        0x00, 0x00, 0x00, 0x72, 0x6D, 0x65, 0x62, 0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x01, 0x00, 0x00, 0x00, 0x62, 0x6B, 0x65, 0x79, 0x73, 0x00, 0x00, 0x00, 0x5A, 0x00, 0x00,
+        0x00, 0x01, 0x00, 0x00, 0x00, 0x42, 0x6B, 0x65, 0x79, 0x64, 0x6D, 0x64, 0x74, 0x61, 0x63,
+        0x6F, 0x6D, 0x2E, 0x61, 0x70, 0x70, 0x6C, 0x65, 0x2E, 0x71, 0x75, 0x69, 0x63, 0x6B, 0x74,
+        0x69, 0x6D, 0x65, 0x2E, 0x76, 0x69, 0x64, 0x65, 0x6F, 0x2E, 0x70, 0x72, 0x65, 0x73, 0x65,
+        0x6E, 0x74, 0x61, 0x74, 0x69, 0x6F, 0x6E, 0x2E, 0x69, 0x6D, 0x6D, 0x65, 0x72, 0x73, 0x69,
+        0x76, 0x65, 0x2D, 0x6D, 0x65, 0x64, 0x69, 0x61, 0x00, 0x00, 0x00, 0x10, 0x64, 0x74, 0x79,
+        0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ];
+
+    #[test]
+    fn play_with_mebx() {
+        let mut reader = Cursor::new(MEBX.to_vec());
+        let header = Header::read_from(&mut reader).expect("should parse mebx header");
+        let _ = meta_sample_entry(&header, "BoxedMetadataSampleEntry", &mut reader)
+            .expect("should get meta sample entry for mebx");
+        println!("{header:?}");
+
+        let header = Header::read_from(&mut reader).expect("should parse box after mebx");
+        println!("{header:?}");
+
+        let header = Header::read_from(&mut reader).expect("should parse box after keys");
+        println!("{header:?}");
+        assert_eq!(FourCC::from(1), header.kind);
+
+        let header = Header::read_from(&mut reader).expect("should parse box after keys");
+        let atom = Keyd::decode_atom(&header, &mut reader).expect("should decode keyd");
+        println!("{header:?}");
+        println!("{atom:?}");
+
+        let header = Header::read_from(&mut reader).expect("should parse header after keyd");
+        println!("{header:?}");
+        let atom = Dtyp::decode_atom(&header, &mut reader).expect("should decode dtyp");
+        println!("{atom:?}");
+    }
+
+    #[test]
+    fn play_with_mdat_and_trun() {
+        // data_offset = 1843658
+        let mut file = File::open("fileSequence1.m4s").expect("could not open file");
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes).expect("error reading file");
+        let sample_size = 179;
+        for i in 0..45 {
+            let data_offset = 1843658 + (i * sample_size);
+            let end = data_offset + sample_size;
+            // Each metadata sample is a box (i.e., size: u32, type: u32, contents: [u8; size])
+            let size = u32::from_be_bytes([
+                bytes[data_offset],
+                bytes[data_offset + 1],
+                bytes[data_offset + 2],
+                bytes[data_offset + 3],
+            ]);
+            let box_type = &bytes[(data_offset + 4)..(data_offset + 8)];
+            // This is actually wrong in general. I believe I need to just go through the entire
+            // sample size and parse boxes as I find them. So, the size value derived from the box
+            // above should be used, and if there is left over, then parse out another box. The box
+            // types are then used to match against data found in the mebx to know if they should be
+            // ignored or not. But, for this example, I know there is only one type of box found in
+            // the mdat I have downloaded, so I'm just sticking with this for the POC.
+            let s = String::from_utf8_lossy(&bytes[(data_offset + 8)..end]);
+            let sample_number = i + 1;
+            println!(
+                "sample {sample_number:02}\n---------\nsize: {size}\ntype: {box_type:?}\n{s}\n"
+            );
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Keyd {
+    pub key_namespace: FourCC,
+    pub key_value: String,
+}
+impl Atom for Keyd {
+    const KIND: FourCC = FourCC::new(b"keyd");
+
+    fn decode_body<B: Buf>(buf: &mut B) -> mp4_atom::Result<Self> {
+        let key_namespace = FourCC::decode(buf)?;
+        let key_value = String::decode(buf)?;
+        Ok(Self {
+            key_namespace,
+            key_value,
+        })
+    }
+
+    fn encode_body<B: mp4_atom::BufMut>(&self, _: &mut B) -> mp4_atom::Result<()> {
+        unimplemented!()
+    }
+}
+
+// https://developer.apple.com/documentation/quicktime-file-format/metadata_datatype_definition_atom
+#[derive(Debug)]
+pub struct Dtyp {
+    pub data_namespace: u32,
+    pub data_value: String,
+}
+impl Atom for Dtyp {
+    const KIND: FourCC = FourCC::new(b"dtyp");
+
+    fn decode_body<B: Buf>(buf: &mut B) -> mp4_atom::Result<Self> {
+        let data_namespace = u32::decode(buf)?;
+        let data_value = if data_namespace == 0 {
+            match u32::decode(buf)? {
+                0 => String::from("RESERVED"),
+                1 => String::from("UTF-8"),
+                2 => String::from("UTF-16"),
+                3 => String::from("S/JIS"),
+                4 => String::from("UTF-8 sort"),
+                5 => String::from("UTF-16 sort"),
+                13 => String::from("JPEG"),
+                14 => String::from("PNG"),
+                21 => String::from("BE Signed Integer"),
+                22 => String::from("BE Unsigned Integer"),
+                23 => String::from("BE Float32"),
+                24 => String::from("BE Float64"),
+                27 => String::from("BMP"),
+                28 => String::from("QuickTime Metadata atom"),
+                65 => String::from("8-bit Signed Integer"),
+                66 => String::from("BE 16-bit Signed Integer"),
+                67 => String::from("BE 32-bit Signed Integer"),
+                70 => String::from("BE PointF32"),
+                71 => String::from("BE DimensionsF32"),
+                72 => String::from("BE RectF32"),
+                74 => String::from("BE 64-bit Signed Integer"),
+                75 => String::from("8-bit Unsigned Integer"),
+                76 => String::from("BE 16-bit Unsigned Integer"),
+                77 => String::from("BE 32-bit Unsigned Integer"),
+                78 => String::from("BE 64-bit Unsigned Integer"),
+                79 => String::from("AffineTransformF64"),
+                n => format!("{n}"),
+            }
+        } else {
+            let mut bytes = Vec::new();
+            while buf.has_remaining() {
+                let byte = u8::decode(buf)?;
+                bytes.push(byte);
+            }
+            String::from_utf8_lossy(&bytes).to_string()
+        };
+        Ok(Self {
+            data_namespace,
+            data_value,
+        })
+    }
+
+    fn encode_body<B: mp4_atom::BufMut>(&self, _: &mut B) -> mp4_atom::Result<()> {
+        unimplemented!()
+    }
+}
+
+fn meta_sample_entry(
+    header: &Header,
+    name: &'static str,
+    reader: &mut Cursor<Vec<u8>>,
+) -> mp4_atom::Result<AtomPropertiesWithDepth> {
+    let header_size = header.size.unwrap_or_else(|| reader.remaining());
+    let new_depth_until = reader.position() + (header_size as u64);
+
+    let meta = MetaSampleEntry::decode(reader)?;
+    Ok(AtomPropertiesWithDepth {
+        properties: AtomProperties::from_static_keys(
+            name,
+            vec![(
+                "data_reference_index",
+                AtomPropertyValue::from(meta.data_reference_index),
+            )],
+        ),
+        new_depth_until: Some(new_depth_until),
+    })
+}
+
+struct MetaSampleEntry {
+    data_reference_index: u16,
+}
+impl Decode for MetaSampleEntry {
+    fn decode<B: Buf>(buf: &mut B) -> mp4_atom::Result<Self> {
+        <[u8; 6]>::decode(buf)?;
+        let data_reference_index = u16::decode(buf)?;
+        Ok(Self {
+            data_reference_index,
+        })
+    }
 }
 
 fn visual_entry(
