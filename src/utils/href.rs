@@ -284,7 +284,7 @@ where
     }
 }
 
-fn replace_hls_variables<'a>(
+pub fn replace_hls_variables<'a>(
     uri: &'a str,
     definitions: &'a HashMap<String, String>,
 ) -> Cow<'a, str> {
@@ -366,11 +366,11 @@ mod tests {
             Some(format!("?playlist_url={expected}")),
             playlist_href(base_url.clone(), uri, &HashMap::new())
         );
+        let segment_ctx = format!("SEGMENT,100,-,{expected}");
         assert_eq!(
             Some(format!(
-                "?playlist_url={}&supplemental_view_context={}",
+                "?playlist_url={}&supplemental_view_context={segment_ctx}",
                 base_url.as_str(),
-                format!("SEGMENT,100,-,{expected}")
             )),
             media_segment_href(
                 base_url.clone(),
@@ -382,11 +382,11 @@ mod tests {
                 &HashMap::new()
             )
         );
+        let map_ctx = format!("MAP,100,-,{expected}");
         assert_eq!(
             Some(format!(
-                "?playlist_url={}&supplemental_view_context={}",
+                "?playlist_url={}&supplemental_view_context={map_ctx}",
                 base_url.as_str(),
-                format!("MAP,100,-,{expected}")
             )),
             media_segment_href(
                 base_url.clone(),
@@ -398,11 +398,11 @@ mod tests {
                 &HashMap::new()
             )
         );
+        let part_ctx = format!("PART,2,100,-,{expected}");
         assert_eq!(
             Some(format!(
-                "?playlist_url={}&supplemental_view_context={}",
+                "?playlist_url={}&supplemental_view_context={part_ctx}",
                 base_url.as_str(),
-                format!("PART,2,100,-,{expected}")
             )),
             media_segment_href(
                 base_url,
