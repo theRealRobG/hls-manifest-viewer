@@ -26,6 +26,7 @@ mod dec3;
 mod desc;
 mod dops;
 mod dref;
+mod dtyp;
 mod dvcc;
 mod dvvc;
 mod elst;
