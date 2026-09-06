@@ -82,6 +82,7 @@ mod saiz;
 mod sbgp;
 mod schm;
 mod senc;
+mod setu;
 mod sgpd;
 mod skip;
 mod smhd;
