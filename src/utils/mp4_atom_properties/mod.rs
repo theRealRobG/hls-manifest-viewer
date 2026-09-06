@@ -52,6 +52,7 @@ mod iref;
 mod irot;
 mod iscl;
 mod ispe;
+mod keyd;
 mod lac4;
 mod ldst;
 mod lfad;
