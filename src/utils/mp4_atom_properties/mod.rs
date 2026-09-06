@@ -761,6 +761,31 @@ fn audio_entry(
     })
 }
 
+/// SampleEntry, ISO/IEC 14496-12:2024 Sect 8.5.2.2
+fn base_sample_entry(
+    header: &Header,
+    name: &'static str,
+    reader: &mut Cursor<Vec<u8>>,
+) -> mp4_atom::Result<AtomPropertiesWithDepth> {
+    let header_size = header.size.unwrap_or_else(|| reader.remaining());
+    let new_depth_until = reader.position() + (header_size as u64);
+
+    u32::decode(reader)?; // reserved
+    u16::decode(reader)?; // reserved
+    let data_reference_index = u16::decode(reader)?;
+
+    Ok(AtomPropertiesWithDepth {
+        properties: AtomProperties::from_static_keys(
+            name,
+            vec![(
+                "data_reference_index",
+                AtomPropertyValue::from(data_reference_index),
+            )],
+        ),
+        new_depth_until: Some(new_depth_until),
+    })
+}
+
 fn byte_array_from(bytes: &[u8]) -> BasicPropertyValue {
     BasicPropertyValue::Hex(bytes.to_vec())
 }
@@ -775,4 +800,40 @@ fn array_string_from<T: Display>(items: &[T]) -> String {
         .map(|item| format!("{item}"))
         .collect::<Vec<String>>()
         .join(", ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mp4_atom::ReadFrom;
+    use pretty_assertions::assert_eq;
+
+    const MEBX: &[u8] = &[
+        0x00, 0x00, 0x00, 0x72, 0x6D, 0x65, 0x62, 0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x01, 0x00, 0x00, 0x00, 0x62, 0x6B, 0x65, 0x79, 0x73, 0x00, 0x00, 0x00, 0x5A, 0x00, 0x00,
+        0x00, 0x01, 0x00, 0x00, 0x00, 0x42, 0x6B, 0x65, 0x79, 0x64, 0x6D, 0x64, 0x74, 0x61, 0x63,
+        0x6F, 0x6D, 0x2E, 0x61, 0x70, 0x70, 0x6C, 0x65, 0x2E, 0x71, 0x75, 0x69, 0x63, 0x6B, 0x74,
+        0x69, 0x6D, 0x65, 0x2E, 0x76, 0x69, 0x64, 0x65, 0x6F, 0x2E, 0x70, 0x72, 0x65, 0x73, 0x65,
+        0x6E, 0x74, 0x61, 0x74, 0x69, 0x6F, 0x6E, 0x2E, 0x69, 0x6D, 0x6D, 0x65, 0x72, 0x73, 0x69,
+        0x76, 0x65, 0x2D, 0x6D, 0x65, 0x64, 0x69, 0x61, 0x00, 0x00, 0x00, 0x10, 0x64, 0x74, 0x79,
+        0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ];
+
+    #[test]
+    fn mebx_decodes_as_sample_entry() {
+        let name = "BoxedMetadataSampleEntry";
+        let mut reader = Cursor::new(MEBX.to_vec());
+        let header = Header::read_from(&mut reader).expect("should parse mebx header");
+        let sample_entry =
+            base_sample_entry(&header, name, &mut reader).expect("should parse sample entry");
+        assert_eq!(Some(114), sample_entry.new_depth_until);
+        assert_eq!(name, sample_entry.properties.box_name);
+        assert_eq!(1, sample_entry.properties.properties.len());
+        let sample_entry_properties = &sample_entry.properties.properties[0];
+        assert_eq!("data_reference_index", sample_entry_properties.0);
+        assert_eq!(
+            AtomPropertyValue::Basic(BasicPropertyValue::U16(1)),
+            sample_entry_properties.1
+        );
+    }
 }
