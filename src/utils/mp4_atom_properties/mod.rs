@@ -573,6 +573,10 @@ pub fn get_properties(
         Dvcc::KIND => try_properties_from::<Dvcc>(header, reader),
         Hvce::KIND => try_properties_from::<Hvce>(header, reader),
         Lhvc::KIND => try_properties_from::<Lhvc>(header, reader),
+        Dtyp::KIND => try_properties_from::<Dtyp>(header, reader),
+        Keyd::KIND => try_properties_from::<Keyd>(header, reader),
+        Loca::KIND => try_properties_from::<Loca>(header, reader),
+        Setu::KIND => try_properties_from::<Setu>(header, reader),
         // Overriding implementation from mp4-atom to add unknown case and nclc case defined in
         // QuickTime File Format.
         Colr::KIND => try_properties_from::<Colr>(header, reader),
