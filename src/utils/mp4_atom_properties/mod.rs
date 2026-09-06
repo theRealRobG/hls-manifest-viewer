@@ -1,7 +1,7 @@
 use crate::utils::mp4_parsing::{
-    dvcc::Dvcc, Blin, Colr, Corg, Dac3, Dac4, Dadj, Dec3, Dvvc, Equi, Fish, Frma, Hequ, Hero,
-    Hfov, Hvce, Lac4, Ldst, Lfad, Lhvc, Lnhd, Lnin, Must, Pkin, Prim, Prft, Prji, Pssh, Rdim,
-    Rect, Schm, Senc, Stri, Tenc, Uqua,
+    dvcc::Dvcc, Blin, Colr, Corg, Dac3, Dac4, Dadj, Dec3, Dtyp, Dvvc, Equi, Fish, Frma, Hequ, Hero,
+    Hfov, Hvce, Keyd, Lac4, Ldst, Lfad, Lhvc, Lnhd, Lnin, Loca, Must, Pkin, Prft, Prim, Prji, Pssh,
+    Rdim, Rect, Schm, Senc, Setu, Stri, Tenc, Uqua,
 };
 use mp4_atom::{Any, Atom, Audio, Buf, Decode, DecodeAtom, FourCC, Header, Visual};
 use std::{borrow::Cow, fmt::Display, io::Cursor};
@@ -70,8 +70,8 @@ mod pasp;
 mod pitm;
 mod pixi;
 mod pkin;
-mod prim;
 mod prft;
+mod prim;
 mod prji;
 mod pssh;
 mod rdim;
@@ -512,25 +512,20 @@ pub fn get_properties(
         four_cc if four_cc == FourCC::new(b"schi") => {
             container(header, "SchemeInformationBox", reader)
         }
+        four_cc if four_cc == FourCC::new(b"keys") => {
+            container(header, "MetadataKeyTableBox", reader)
+        }
         // VEXU container boxes (QuickTime and ISO Base Media File Formats and Spatial and Immersive Media, Version 1.9.8 (Beta))
         four_cc if four_cc == FourCC::new(b"vexu") => {
             container(header, "VideoExtendedUsageBox", reader)
         }
-        four_cc if four_cc == FourCC::new(b"eyes") => {
-            container(header, "StereoViewBox", reader)
-        }
+        four_cc if four_cc == FourCC::new(b"eyes") => container(header, "StereoViewBox", reader),
         four_cc if four_cc == FourCC::new(b"cams") => {
             container(header, "StereoCameraSystemBox", reader)
         }
-        four_cc if four_cc == FourCC::new(b"cmfy") => {
-            container(header, "StereoComfortBox", reader)
-        }
-        four_cc if four_cc == FourCC::new(b"proj") => {
-            container(header, "ProjectionBox", reader)
-        }
-        four_cc if four_cc == FourCC::new(b"pack") => {
-            container(header, "ViewPackingBox", reader)
-        }
+        four_cc if four_cc == FourCC::new(b"cmfy") => container(header, "StereoComfortBox", reader),
+        four_cc if four_cc == FourCC::new(b"proj") => container(header, "ProjectionBox", reader),
+        four_cc if four_cc == FourCC::new(b"pack") => container(header, "ViewPackingBox", reader),
         four_cc if four_cc == FourCC::new(b"lnsc") => {
             container(header, "CameraSystemLensCollectionBox", reader)
         }
