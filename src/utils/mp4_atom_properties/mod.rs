@@ -59,6 +59,7 @@ mod lfad;
 mod lhvc;
 mod lnhd;
 mod lnin;
+mod loca;
 mod mdhd;
 mod mehd;
 mod mfhd;
