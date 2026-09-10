@@ -464,19 +464,16 @@ pub fn get_properties(
                 "Extends to end of file",
             ))),
     );
-    match mebx_keys_parsing_state {
-        MebxKeysParsingState::ParsingKeys { until } => {
-            let mut props = metadata_key_box(header, "MetadataKeyBox", reader)?;
-            if let Some(key_box_until) = props.new_depth_until {
-                *mebx_keys_parsing_state = MebxKeysParsingState::ParsingKeyBox {
-                    keys_until: *until,
-                    key_box_until,
-                };
-            }
-            props.properties.properties.insert(0, ("size".into(), size));
-            return Ok(props);
+    if let MebxKeysParsingState::ParsingKeys { until } = mebx_keys_parsing_state {
+        let mut props = metadata_key_box(header, "MetadataKeyBox", reader)?;
+        if let Some(key_box_until) = props.new_depth_until {
+            *mebx_keys_parsing_state = MebxKeysParsingState::ParsingKeyBox {
+                keys_until: *until,
+                key_box_until,
+            };
         }
-        _ => (),
+        props.properties.properties.insert(0, ("size".into(), size));
+        return Ok(props);
     }
     const DVHE: FourCC = FourCC::new(b"dvhe");
     const DVH1: FourCC = FourCC::new(b"dvh1");
