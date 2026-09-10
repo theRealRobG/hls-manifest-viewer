@@ -432,9 +432,29 @@ pub struct AtomPropertiesWithDepth {
     pub new_depth_until: Option<u64>,
 }
 
+/// Status of parsing when considering mebx box.
+///
+/// The mebx box is special in that it contains the keys box which is a container for boxes with
+/// custom type identifiers. The type is a u32 as normal; however, it may not be a mnemonic, and it
+/// may even use a value that clashes with an already registered box name. Because of this, we need
+/// to handle child boxes of keys specially and thus why we need to keep this state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MebxKeysParsingState {
+    /// Not within the `keys` box.
+    #[default]
+    OutsideKeys,
+    /// The `keys` box was the last box parsed and the `size` indicated that it ends at the `until`
+    /// byte count.
+    ParsingKeys { until: u64 },
+    /// We are within a `keyd` found in the `keys`. Once we reach `keyd_until` we may find another
+    /// custom box type. Once we reach `keys_until` we are outside of the `keys`.
+    ParsingKeyBox { keys_until: u64, key_box_until: u64 },
+}
+
 pub fn get_properties(
     header: &Header,
     reader: &mut Cursor<Vec<u8>>,
+    mebx_keys_parsing_state: &mut MebxKeysParsingState,
 ) -> mp4_atom::Result<AtomPropertiesWithDepth> {
     let size = AtomPropertyValue::Basic(
         header
@@ -444,6 +464,20 @@ pub fn get_properties(
                 "Extends to end of file",
             ))),
     );
+    match mebx_keys_parsing_state {
+        MebxKeysParsingState::ParsingKeys { until } => {
+            let mut props = metadata_key_box(header, "MetadataKeyBox", reader)?;
+            if let Some(key_box_until) = props.new_depth_until {
+                *mebx_keys_parsing_state = MebxKeysParsingState::ParsingKeyBox {
+                    keys_until: *until,
+                    key_box_until,
+                };
+            }
+            props.properties.properties.insert(0, ("size".into(), size));
+            return Ok(props);
+        }
+        _ => (),
+    }
     const DVHE: FourCC = FourCC::new(b"dvhe");
     const DVH1: FourCC = FourCC::new(b"dvh1");
     let mut properties = match header.kind {
@@ -493,6 +527,17 @@ pub fn get_properties(
         // Apple Positional Audio Codec (APAC) — follows standard AudioSampleEntry layout
         four_cc if four_cc == FourCC::new(b"apac") => {
             audio_entry(header, "ApacSampleEntryBox", reader)
+        }
+        // BoxedMetadataSampleEntry, ISO/IEC 14496-12:2024 Sect 12.9.3
+        four_cc if four_cc == FourCC::new(b"mebx") => {
+            base_sample_entry(header, "BoxedMetadataSampleEntry", reader)
+        }
+        four_cc if four_cc == FourCC::new(b"keys") => {
+            let props = container(header, "MetadataKeyTableBox", reader)?;
+            if let Some(until) = props.new_depth_until {
+                *mebx_keys_parsing_state = MebxKeysParsingState::ParsingKeys { until };
+            }
+            Ok(props)
         }
         mp4_atom::Mdat::KIND => {
             let remaining_box_size = header.size.unwrap_or_else(|| reader.remaining());
@@ -686,6 +731,33 @@ fn container(
     let version_and_flags = decode_container_version_and_flags(header, reader)?;
     Ok(AtomPropertiesWithDepth {
         properties: AtomProperties::from_static_keys(name, version_and_flags),
+        new_depth_until: Some(new_depth_until),
+    })
+}
+
+/// MetadataKeyBox, ISO/IEC 14496-12:2024 Sect 12.9.4.3
+fn metadata_key_box(
+    header: &Header,
+    name: &'static str,
+    reader: &mut Cursor<Vec<u8>>,
+) -> mp4_atom::Result<AtomPropertiesWithDepth> {
+    let header_size = header.size.unwrap_or_else(|| reader.remaining());
+    let new_depth_until = reader.position() + (header_size as u64);
+    let kind: [u8; 4] = header.kind.into();
+    Ok(AtomPropertiesWithDepth {
+        properties: AtomProperties::from_static_keys(
+            name,
+            vec![
+                (
+                    "local_key_id",
+                    AtomPropertyValue::Basic(BasicPropertyValue::Hex(kind.to_vec())),
+                ),
+                (
+                    "local_key_id_utf_8",
+                    AtomPropertyValue::from(String::from_utf8_lossy(&kind).to_string()),
+                ),
+            ],
+        ),
         new_depth_until: Some(new_depth_until),
     })
 }

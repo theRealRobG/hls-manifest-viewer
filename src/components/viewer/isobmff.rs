@@ -1,7 +1,8 @@
 use crate::{
     components::viewer::ISOBMFF_VIEW_CLASS,
     utils::mp4_atom_properties::{
-        AtomProperties, AtomPropertyValue, BasicPropertyValue, TablePropertyValue, get_properties,
+        get_properties, AtomProperties, AtomPropertyValue, BasicPropertyValue,
+        MebxKeysParsingState, TablePropertyValue,
     },
 };
 use leptos::{
@@ -24,6 +25,7 @@ pub fn IsobmffViewer(data: Vec<u8>) -> mp4_atom::Result<impl IntoView> {
     let mut properties = Vec::new();
     let mut index = 0usize;
     let mut container_box_end_positions = Vec::new();
+    let mut mebx_keys_parsing_state = MebxKeysParsingState::default();
     loop {
         let header = Header::read_from(&mut reader)?;
         // Handle popping out of depths when we have reached the end of container boxes. Multiple
@@ -56,12 +58,36 @@ pub fn IsobmffViewer(data: Vec<u8>) -> mp4_atom::Result<impl IntoView> {
                 break;
             }
         }
+        // We must also handle mebx parsing, where we will encounter custom key names within the
+        // MetadataKeyTableBox (keys).
+        match mebx_keys_parsing_state {
+            MebxKeysParsingState::OutsideKeys => (),
+            MebxKeysParsingState::ParsingKeys { until } => {
+                if reader.position() >= until {
+                    mebx_keys_parsing_state = Default::default();
+                }
+            }
+            MebxKeysParsingState::ParsingKeyBox {
+                keys_until,
+                key_box_until,
+            } => {
+                let reader_position = reader.position();
+                if reader_position >= key_box_until {
+                    if reader_position >= keys_until {
+                        mebx_keys_parsing_state = Default::default();
+                    } else {
+                        mebx_keys_parsing_state =
+                            MebxKeysParsingState::ParsingKeys { until: keys_until };
+                    }
+                }
+            }
+        }
         // The depth is then the size of the depths vector. We take the depth now (before the new
         // info) because a new container box should still appear at the same depth as its sibling
         // boxes.
         let depth = container_box_end_positions.len();
         // We then get the property information for this box.
-        let info = get_properties(&header, &mut reader)?;
+        let info = get_properties(&header, &mut reader, &mut mebx_keys_parsing_state)?;
         // If the new info is a container box then we will receive a new "depth until" that
         // indicates at what reader position this box will end at. Above we handle tracking how deep
         // we are into any given box and at what size the box ends.
@@ -73,6 +99,7 @@ pub fn IsobmffViewer(data: Vec<u8>) -> mp4_atom::Result<impl IntoView> {
             <AtomName
                 atom=header.kind
                 depth
+                atom_name=info.properties.box_name
                 highlighted=move || highlighted.get() == index
                 on_click=move |_| set_highlighted.set(index)
             />
@@ -103,6 +130,7 @@ pub fn IsobmffViewer(data: Vec<u8>) -> mp4_atom::Result<impl IntoView> {
 fn AtomName(
     atom: FourCC,
     depth: usize,
+    atom_name: &'static str,
     highlighted: impl Fn() -> bool + Send + Sync + 'static,
     on_click: impl FnMut(MouseEvent) + 'static,
 ) -> impl IntoView {
@@ -110,9 +138,18 @@ fn AtomName(
     for _ in 0..depth {
         space.push_str("  ");
     }
+    let text = if atom_name == "MetadataKeyBox" {
+        let kind: [u8; 4] = atom.into();
+        format!(
+            "{space}{}",
+            String::from(&BasicPropertyValue::Hex(kind.to_vec()))
+        )
+    } else {
+        format!("{space}{atom}")
+    };
     view! {
         <pre class:highlighted=highlighted on:click=on_click>
-            {format!("{space}{atom}")}
+            {text}
         </pre>
     }
 }
