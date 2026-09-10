@@ -732,7 +732,7 @@ fn probe_mp4(data: Vec<u8>) -> Mp4ProbeInfo {
         }
         if reader.position() as usize >= reader.get_ref().len() { break; }
         let Ok(header) = Header::read_from(&mut reader) else { break; };
-        let Ok(atom)   = get_properties(&header, &mut reader) else { break; };
+        let Ok(atom)   = get_properties(&header, &mut reader, &mut Default::default()) else { break; };
         if let Some(e) = atom.new_depth_until { container_ends.push(e); }
 
         let props = &atom.properties;
